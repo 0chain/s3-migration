@@ -13,6 +13,7 @@ type AppConfig struct {
 	Buckets       []string
 	Region        string
 	MigrateToPath string
+	WhoPays       string
 	Encrypt       bool
 }
 
@@ -22,7 +23,7 @@ type FileRef struct {
 	Region     string
 	Key        string
 	Size       int64
-	UploadType string
+	IsUpdate   bool
 	ModifiedAt time.Time
 }
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	thrown "github.com/0chain/errors"
+	"github.com/0chain/gosdk/core/common"
 	"github.com/0chain/gosdk/zboxcore/fileref"
 	"github.com/0chain/gosdk/zboxcore/sdk"
 	"github.com/0chain/gosdk/zboxcore/zboxutil"
@@ -61,6 +62,7 @@ type Migration struct {
 
 	//Number of goroutines to run. So at most concurrency * Batch goroutines will run. i.e. for bucket level and object level
 	concurrency int
+	whoPays     string
 	encrypt     bool
 }
 
@@ -71,8 +73,9 @@ func NewMigration() *Migration {
 func (m *Migration) InitMigration(ctx context.Context, allocation *sdk.Allocation, s3Service s3.S3, appConfig *model.AppConfig) error {
 	m.s3Service = s3Service
 	m.allocation = allocation
-	m.resume = appConfig.Resume
+	m.whoPays = appConfig.WhoPays
 	m.encrypt = appConfig.Encrypt
+	m.resume = appConfig.Resume
 	m.skip = appConfig.Skip
 	m.concurrency = appConfig.Concurrency
 
@@ -189,13 +192,10 @@ func (m *Migration) Migrate() error {
 			count++
 			uploadInProgress++
 			go func() {
-				log.Println(migrationFile.Path, "will be uploaded from here")
-
 				defer func() {
 					uploadInProgress--
 					wg.Done()
 				}()
-				// todo:
 
 				src, err := m.s3Service.GetFile(context.Background(), model.GetFileOptions{
 					Bucket: migrationFile.Bucket,
@@ -215,20 +215,17 @@ func (m *Migration) Migrate() error {
 
 				var attrs fileref.Attributes
 
-				//if u.WhoPays != "" {
-				//	var wp common.WhoPays
-				//	if err = wp.Parse(u.WhoPays); err != nil {
-				//		return fmt.Errorf("error parssing who-pays value. %s", err.Error())
-				//	}
-				//	attrs.WhoPaysForReads = wp // set given value
-				//}
-				//if u.Encrypt {
-				//	//err = allocationObj.EncryptAndUploadFile(u.UploadConfig.LocalTempFilePath, u.UploadConfig.RemoteFilePath, attrs, statusBar)
-				//	log.Println("encryption has not been implemented for direct upload")
-				//}
+				if m.whoPays != "" {
+					var wp common.WhoPays
+					if err = wp.Parse(m.whoPays); err != nil {
+						fmt.Printf("error parssing who-pays value. %s", err.Error())
+					} else {
+						attrs.WhoPaysForReads = wp
+					}
+				}
 				//todo: implement encrypt and who-pays by putting user input in Migration config
 
-				err = startChunkedUpload(m.allocation, src.SourceFile, src.FilePath, src.FileType, src.FileSize, false, attrs, statusBar, false)
+				err = startChunkedUpload(m.allocation, src.SourceFile, src.FilePath, src.FileType, src.FileSize, m.encrypt, attrs, statusBar, migrationFile.IsUpdate)
 				if err != nil {
 					log.Println(err)
 				}
@@ -245,9 +242,6 @@ func (m *Migration) Migrate() error {
 	}()
 
 	for _, bkt := range m.buckets {
-		//if bkt.name != "iamrz1-migration" {
-		//	continue
-		//}
 		_, err := m.s3Service.ListFilesInBucket(context.Background(), model.ListFileOptions{Bucket: bkt.name, Prefix: bkt.prefix, Region: bkt.region, FileQueue: migrationFileQueue, WaitGroup: &wg})
 		if err != nil {
 			log.Println(err)

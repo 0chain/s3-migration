@@ -24,6 +24,7 @@ var (
 	skip                 int // 0 --> Replace; 1 --> Skip; 2 --> Duplicate
 	region               string
 	allocationTextPath   string
+	whoPays              string
 	awsCredPath          string
 )
 
@@ -33,18 +34,18 @@ func init() {
 
 	//flags related to dStorage
 	migrateCmd.PersistentFlags().StringVar(&allocationId, "allocation", "", "allocation ID for dStorage")
+	migrateCmd.Flags().StringVar(&allocationTextPath, "alloc-path", "alloc-path", "File Path to allocation text")
+	migrateCmd.Flags().StringVar(&whoPays, "attr-who-pays-for-reads", "", "Read payment source")
+	migrateCmd.Flags().BoolVar(&encrypt, "encrypt", false, "pass this option to encrypt and upload the file")
 	//flags related to s3
 	migrateCmd.PersistentFlags().StringVar(&accessKey, "access-key", "", "access-key of aws")
 	migrateCmd.PersistentFlags().StringVar(&secretKey, "secret-key", "", "secret-key of aws")
 	migrateCmd.PersistentFlags().StringVar(&region, "region", "", "region of s3 buckets")
 	migrateCmd.PersistentFlags().StringSliceVar(&buckets, "buckets", []string{}, "specific s3 buckets to use. Use bucketName:prefix format if prefix filter is required or only bucketName for migrating all objects")
 	migrateCmd.Flags().StringVar(&migrateToPath, "migrate-to", "/", "Remote path where buckets will be migrated to")
-
-	migrateCmd.Flags().StringVar(&allocationTextPath, "alloc-path", "alloc-path", "File Path to allocation text")
 	migrateCmd.Flags().StringVar(&awsCredPath, "aws-cred-path", "", "File Path to aws credentials")
 
 	migrateCmd.Flags().IntVar(&concurrency, "concurrency", 10, "number of concurrent files to process concurrently during migration")
-	migrateCmd.Flags().BoolVar(&encrypt, "encrypt", false, "pass this option to encrypt and upload the file")
 	migrateCmd.Flags().BoolVar(&resume, "resume", false, "pass this option to resume migration from previous state")
 	migrateCmd.Flags().IntVar(&skip, "skip", 1, "0 --> Replace existing files; 1 --> Skip migration; 2 --> Duplicate")
 }
@@ -115,6 +116,7 @@ var migrateCmd = &cobra.Command{
 			Concurrency:   concurrency,
 			Buckets:       buckets,
 			MigrateToPath: migrateToPath,
+			WhoPays:       whoPays,
 			Encrypt:       encrypt,
 		}
 

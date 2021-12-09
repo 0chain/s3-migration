@@ -205,11 +205,13 @@ func (s *Service) ListFilesInBucket(ctx context.Context, opts model.ListFileOpti
 
 			filePath := fmt.Sprintf("/%s/%s", opts.Bucket, aws.ToString(obj.Key))
 
+			isUpdate := false
 			if existingFiles[filePath] != nil {
 				log.Println("duplicate file found with full path: ", filePath)
 				if existingFiles[filePath].Size == obj.Size && existingFiles[filePath].ModifiedAt.Unix() > aws.ToTime(obj.LastModified).Unix() {
 					continue
 				}
+				isUpdate = true
 			}
 
 			log.Println("Enqueue this file to be uploaded:", aws.ToString(obj.Key)) //todo: compare with existing files and manage conflicts (skip, replace, rename)
@@ -222,7 +224,7 @@ func (s *Service) ListFilesInBucket(ctx context.Context, opts model.ListFileOpti
 				Key:        aws.ToString(obj.Key),
 				Size:       obj.Size,
 				ModifiedAt: aws.ToTime(obj.LastModified),
-				UploadType: "later", //regular, replace, rename
+				IsUpdate:   isUpdate, //regular, replace, rename
 			}
 		}
 
