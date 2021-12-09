@@ -107,3 +107,25 @@ func readLines(path string) ([]string, error) {
 	}
 	return lines, scanner.Err()
 }
+
+func TrimSuffixPrefix(in, sp string) string {
+	for {
+		if strings.HasPrefix(in, sp) {
+			in = strings.TrimPrefix(in, sp)
+			continue
+		}
+
+		break
+	}
+
+	for {
+		if strings.HasSuffix(in, sp) {
+			in = strings.TrimSuffix(in, sp)
+			continue
+		}
+
+		break
+	}
+
+	return in
+}

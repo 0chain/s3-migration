@@ -1,6 +1,7 @@
 package model
 
 import (
+	"io"
 	"sync"
 	"time"
 )
@@ -16,11 +17,12 @@ type AppConfig struct {
 }
 
 type FileRef struct {
-	Name       string
-	Size       int64
-	UploadType string
+	Path       string
 	Bucket     string
 	Region     string
+	Key        string
+	Size       int64
+	UploadType string
 	ModifiedAt time.Time
 }
 
@@ -30,4 +32,16 @@ type ListFileOptions struct {
 	Region    string
 	FileQueue chan FileRef
 	WaitGroup *sync.WaitGroup
+}
+type GetFileOptions struct {
+	Bucket string
+	Region string
+	Key    string
+}
+
+type S3Object struct {
+	SourceFile io.Reader
+	FileType   string
+	FileSize   int64
+	FilePath   string
 }

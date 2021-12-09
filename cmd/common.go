@@ -32,7 +32,7 @@ func (s *StatusBar) Completed(allocationId, filePath string, filename string, mi
 	if !allocUnderRepair {
 		defer s.wg.Done()
 	}
-	fmt.Println("Status completed callback. Type = " + mimetype + ". Name = " + filename)
+	fmt.Println("Status completed callback. Type = " + mimetype + ". Path = " + filename)
 }
 
 func (s *StatusBar) Error(allocationID string, filePath string, op int, err error) {

@@ -21,16 +21,16 @@ func (s *StatusBar) Completed(allocationId, filePath string, filename string, mi
 	if s.b != nil {
 		s.b.Finish()
 	}
-	s.success = true
-	s.wg.Done()
+	s.Success = true
+	s.Wg.Done()
 }
 
 func (s *StatusBar) Error(allocationID string, filePath string, op int, err error) {
 	if s.b != nil {
 		s.b.Finish()
 	}
-	s.success = false
-	s.wg.Done()
+	s.Success = false
+	s.Wg.Done()
 	var errDetail interface{} = "Unknown Error"
 	if err != nil {
 		errDetail = err.Error()
@@ -40,12 +40,12 @@ func (s *StatusBar) Error(allocationID string, filePath string, op int, err erro
 }
 
 func (s *StatusBar) CommitMetaCompleted(request, response string, err error) {
-	defer s.wg.Done()
+	defer s.Wg.Done()
 	if err != nil {
-		s.success = false
+		s.Success = false
 		PrintError("Error in commitMetaTransaction." + err.Error())
 	} else {
-		s.success = true
+		s.Success = true
 		fmt.Println("Commit Metadata successful, Response :", response)
 	}
 }
@@ -55,8 +55,8 @@ func (s *StatusBar) RepairCompleted(filesRepaired int) {
 
 type StatusBar struct {
 	b       *pb.ProgressBar
-	wg      *sync.WaitGroup
-	success bool
+	Wg      *sync.WaitGroup
+	Success bool
 }
 
 func PrintError(v ...interface{}) {

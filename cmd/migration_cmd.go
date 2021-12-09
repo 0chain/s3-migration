@@ -103,7 +103,10 @@ var migrateCmd = &cobra.Command{
 			return err
 		}
 
-		s3Service := s3svc.NewService(region)
+		s3Service, err := s3svc.NewService(region)
+		if err != nil {
+			return err
+		}
 
 		appConfig := model.AppConfig{
 			Region:        region,

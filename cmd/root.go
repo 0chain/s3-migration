@@ -88,6 +88,7 @@ func initConfig() {
 	// set the log file
 	zcncore.SetLogFile("cmdlog.log", !bSilent)
 	sdk.SetLogFile("cmdlog.log", !bSilent)
+	sdk.SetLogLevel(0)
 
 	if network.IsValid() {
 		zcncore.SetNetwork(network.Miners, network.Sharders)

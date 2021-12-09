@@ -3,20 +3,21 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
+	"github.com/0chain/s3migration/model"
 	"github.com/0chain/s3migration/s3"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	awsS3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	"golang.org/x/sync/errgroup"
 	"log"
+	"path"
 	"sync"
-
-	"github.com/0chain/s3migration/model"
 )
 
-var existingFiles map[string]model.FileRef
+var existingFiles map[string]*model.FileRef
 
-func SetExistingFileList(dStorageFiles map[string]model.FileRef) {
+func SetExistingFileList(dStorageFiles map[string]*model.FileRef) {
 	existingFiles = dStorageFiles
 }
 
@@ -24,7 +25,7 @@ type Service struct {
 	clientMap map[string]*awsS3.Client
 }
 
-func NewService(region string) *Service {
+func NewService(region string) (*Service, error) {
 	clientMap := make(map[string]*awsS3.Client)
 	if len(region) == 0 {
 		region = "us-east-1"
@@ -33,7 +34,7 @@ func NewService(region string) *Service {
 	var cfg aws.Config
 	cfg, err := awsConfig.LoadDefaultConfig(context.Background())
 	if err != nil {
-		panic("configuration error " + err.Error() + "region: " + region)
+		return nil, fmt.Errorf("configuration error " + err.Error() + "region: " + region)
 	}
 
 	cfg.Region = region
@@ -42,7 +43,7 @@ func NewService(region string) *Service {
 
 	return &Service{
 		clientMap: clientMap,
-	}
+	}, nil
 }
 
 func (s *Service) InitClientWithRegion(region string) {
@@ -198,10 +199,27 @@ func (s *Service) ListFilesInBucket(ctx context.Context, opts model.ListFileOpti
 		}
 
 		for _, obj := range page.Contents {
+			if obj.Size == 0 {
+				continue
+			}
+
+			filePath := fmt.Sprintf("/%s/%s", opts.Bucket, aws.ToString(obj.Key))
+
+			if existingFiles[filePath] != nil {
+				log.Println("duplicate file found with full path: ", filePath)
+				if existingFiles[filePath].Size == obj.Size && existingFiles[filePath].ModifiedAt.Unix() > aws.ToTime(obj.LastModified).Unix() {
+					continue
+				}
+			}
+
+			log.Println("Enqueue this file to be uploaded:", aws.ToString(obj.Key)) //todo: compare with existing files and manage conflicts (skip, replace, rename)
+
+			opts.WaitGroup.Add(1)
 			opts.FileQueue <- model.FileRef{
+				Path:       filePath,
 				Bucket:     opts.Bucket,
 				Region:     opts.Region,
-				Name:       aws.ToString(obj.Key),
+				Key:        aws.ToString(obj.Key),
 				Size:       obj.Size,
 				ModifiedAt: aws.ToTime(obj.LastModified),
 				UploadType: "later", //regular, replace, rename
@@ -211,4 +229,23 @@ func (s *Service) ListFilesInBucket(ctx context.Context, opts model.ListFileOpti
 	}
 
 	return bucketFiles, nil
+}
+
+func (s *Service) GetFile(ctx context.Context, opts model.GetFileOptions) (*model.S3Object, error) {
+	log.Println("GetFile : ")
+	client := s.getClient(opts.Region)
+
+	out, err := client.GetObject(ctx, &awsS3.GetObjectInput{Bucket: aws.String(opts.Bucket), Key: aws.String(opts.Key)})
+	if err != nil {
+		return nil, err
+	}
+
+	res := &model.S3Object{
+		SourceFile: out.Body,
+		FileType:   aws.ToString(out.ContentType),
+		FileSize:   out.ContentLength,
+		FilePath:   fmt.Sprintf("/%s", path.Join(opts.Bucket, opts.Key)),
+	}
+
+	return res, nil
 }

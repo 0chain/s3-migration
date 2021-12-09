@@ -2,12 +2,20 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	thrown "github.com/0chain/errors"
+	"github.com/0chain/gosdk/zboxcore/fileref"
 	"github.com/0chain/gosdk/zboxcore/sdk"
+	"github.com/0chain/gosdk/zboxcore/zboxutil"
+	"github.com/0chain/s3migration/dstorage/service"
 	"github.com/0chain/s3migration/model"
 	"github.com/0chain/s3migration/s3"
 	s3svc "github.com/0chain/s3migration/s3/service"
+	"github.com/0chain/s3migration/util"
+	"io"
 	"log"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -81,34 +89,30 @@ func (m *Migration) InitMigration(ctx context.Context, allocation *sdk.Allocatio
 		}
 
 		for _, bkt := range bucketWithLocation {
-			log.Println(bkt)
-			// todo: get region for each bucket
-
 			m.buckets = append(m.buckets, bucket{
 				name:   bkt.Name,
-				prefix: "",
 				region: bkt.Location,
 			})
 		}
 	} else {
 		for _, bkt := range appConfig.Buckets {
-			res := strings.Split(bkt, ":")
-			l := len(res)
-			if l < 1 || l > 2 {
-				return fmt.Errorf("bucket flag has fields less than 1 or greater than 2. Arg \"%v\"", bkt)
+			if bkt == "" {
+				return fmt.Errorf("bucket values can not be empty")
 			}
 
-			bucketName := res[0]
-			var prefix string
+			res := strings.Split(bkt, ":")
+			bucketName := util.TrimSuffixPrefix(res[0], "/")
+			prefix := ""
 
-			if l == 2 {
-				prefix = res[1]
+			if len(res) == 2 {
+				prefix = util.TrimSuffixPrefix(res[1], "/")
 			}
 
 			bucketWithRegion, _ := m.s3Service.GetBucketRegion(ctx, []string{bucketName})
 			if len(bucketWithRegion) == 0 {
 				continue
 			}
+
 			m.buckets = append(m.buckets, bucket{
 				name:   bucketName,
 				prefix: prefix,
@@ -126,7 +130,7 @@ func (m *Migration) InitMigration(ctx context.Context, allocation *sdk.Allocatio
 
 // getExistingFileList list existing files (with size) from dStorage
 func setExistingFileList(allocationID string) error {
-	dStorageFileList := make(map[string]model.FileRef, 0)
+	dStorageFileList := make(map[string]*model.FileRef, 0)
 	allocationObj, err := sdk.GetAllocation(allocationID)
 	if err != nil {
 		log.Println("Error fetching the allocation", err)
@@ -145,12 +149,11 @@ func setExistingFileList(allocationID string) error {
 		return err
 	}
 
-	// todo: add updated_by field in GetRemoteFileMap method of go-sdk
-
 	for remoteFileName, remoteFileValue := range remoteFiles {
 		if remoteFileValue.ActualSize > 0 {
-			dStorageFileList[remoteFileName] = model.FileRef{Name: remoteFileName, Size: remoteFileValue.ActualSize}
-			//dStorageFileList[remoteFileName] = model.FileRef{Name: remoteFileName, Size: remoteFileValue.ActualSize, ModifiedAt: remoteFileValue.UpdatedAt}
+			dStorageFileList[remoteFileName] = &model.FileRef{Path: remoteFileName, Size: remoteFileValue.ActualSize, ModifiedAt: time.Now().UTC()}
+			// todo: add updated_by field in GetRemoteFileMap method of go-sdk
+			//dStorageFileList[remoteFileName] = model.FileRef{Path: remoteFileName, Size: remoteFileValue.ActualSize, ModifiedAt: remoteFileValue.UpdatedAt}
 		}
 	}
 
@@ -186,13 +189,55 @@ func (m *Migration) Migrate() error {
 			count++
 			uploadInProgress++
 			go func() {
-				log.Println(migrationFile.Name, "will be uploaded from here")
+				log.Println(migrationFile.Path, "will be uploaded from here")
 
+				defer func() {
+					uploadInProgress--
+					wg.Done()
+				}()
 				// todo:
 
-				uploadInProgress--
+				src, err := m.s3Service.GetFile(context.Background(), model.GetFileOptions{
+					Bucket: migrationFile.Bucket,
+					Region: migrationFile.Region,
+					Key:    migrationFile.Key,
+				})
+				if err != nil {
+					log.Println(err)
+					return
+				}
 
-				wg.Done()
+				log.Println(src.FilePath, src.FileSize)
+
+				uwg := &sync.WaitGroup{}
+				statusBar := &service.StatusBar{Wg: uwg}
+				uwg.Add(1)
+
+				var attrs fileref.Attributes
+
+				//if u.WhoPays != "" {
+				//	var wp common.WhoPays
+				//	if err = wp.Parse(u.WhoPays); err != nil {
+				//		return fmt.Errorf("error parssing who-pays value. %s", err.Error())
+				//	}
+				//	attrs.WhoPaysForReads = wp // set given value
+				//}
+				//if u.Encrypt {
+				//	//err = allocationObj.EncryptAndUploadFile(u.UploadConfig.LocalTempFilePath, u.UploadConfig.RemoteFilePath, attrs, statusBar)
+				//	log.Println("encryption has not been implemented for direct upload")
+				//}
+				//todo: implement encrypt and who-pays by putting user input in Migration config
+
+				err = startChunkedUpload(m.allocation, src.SourceFile, src.FilePath, src.FileType, src.FileSize, false, attrs, statusBar, false)
+				if err != nil {
+					log.Println(err)
+				}
+
+				uwg.Wait()
+				if !statusBar.Success {
+					fmt.Printf("upload failed. statusbar. success : %v \n", statusBar.Success)
+					//todo: keep an array of failed uploads
+				}
 			}()
 
 			time.Sleep(time.Second)
@@ -200,16 +245,68 @@ func (m *Migration) Migrate() error {
 	}()
 
 	for _, bkt := range m.buckets {
+		//if bkt.name != "iamrz1-migration" {
+		//	continue
+		//}
 		_, err := m.s3Service.ListFilesInBucket(context.Background(), model.ListFileOptions{Bucket: bkt.name, Prefix: bkt.prefix, Region: bkt.region, FileQueue: migrationFileQueue, WaitGroup: &wg})
 		if err != nil {
 			log.Println(err)
+			return err
 		}
-
 	}
-	fmt.Println("Waiting for all goroutine to complete")
+
 	wg.Wait()
-	fmt.Println("Waiting done", uploadInProgress)
 	return nil
+}
+
+func startChunkedUpload(allocationObj *sdk.Allocation, fileReader io.Reader, remotePath, mimeType string, size int64, encrypt bool, attrs fileref.Attributes, statusBar sdk.StatusCallback, isUpdate bool) error {
+	remotePath = zboxutil.RemoteClean(remotePath)
+	isabs := zboxutil.IsRemoteAbs(remotePath)
+	if !isabs {
+		err := thrown.New("invalid_path", "Path should be valid and absolute")
+		return err
+	}
+	remotePath = zboxutil.GetFullRemotePath(remotePath, remotePath)
+
+	_, fileName := filepath.Split(remotePath)
+
+	fileMeta := sdk.FileMeta{
+		Path:       remotePath,
+		ActualSize: size,
+		MimeType:   mimeType,
+		RemoteName: fileName,
+		RemotePath: remotePath,
+		Attributes: attrs,
+	}
+
+	ChunkedUpload, err := sdk.CreateChunkedUpload(util.GetHomeDir(), allocationObj, fileMeta, newS3Reader(fileReader), isUpdate,
+		sdk.WithChunkSize(sdk.DefaultChunkSize),
+		sdk.WithEncrypt(encrypt),
+		sdk.WithStatusCallback(statusBar))
+	if err != nil {
+		return err
+	}
+
+	return ChunkedUpload.Start()
+}
+
+func newS3Reader(source io.Reader) *S3StreamReader {
+	return &S3StreamReader{source}
+}
+
+type S3StreamReader struct {
+	io.Reader
+}
+
+func (r *S3StreamReader) Read(p []byte) (int, error) {
+	bLen, err := io.ReadAtLeast(r.Reader, p, len(p))
+	if err != nil {
+		if errors.Is(err, io.ErrUnexpectedEOF) {
+			return bLen, io.EOF
+		}
+		return bLen, err
+	}
+	return bLen, nil
 }
 
 type objectUploadStatus struct {
@@ -247,6 +344,7 @@ func (ms *MigrationState) cleanBatch() {
 		//Save state in some file
 	}
 }
+
 func (ms *MigrationState) saveState() {
 	//Write its state to the file
 	//Check objectUploadStatus
