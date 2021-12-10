@@ -87,7 +87,7 @@ var migrateCmd = &cobra.Command{
 
 		if accessKey != "" && secretKey != "" {
 			if err := util.SetAwsEnvCredentials(accessKey, secretKey); err != nil {
-				return errors.New("failed to set aws custom credentials")
+				return fmt.Errorf("failed to set aws custom credentials")
 			}
 		}
 

@@ -46,14 +46,16 @@ func NewService(region string) (*Service, error) {
 	}, nil
 }
 
-func (s *Service) InitClientWithRegion(region string) {
+func (s *Service) InitClientWithRegion(region string) error {
 	cfg, err := awsConfig.LoadDefaultConfig(context.Background())
 	if err != nil {
-		panic("configuration error " + err.Error() + "region: " + region)
+		return fmt.Errorf("configuration error " + err.Error() + "region: " + region)
 	}
 	cfg.Region = region
 	client := awsS3.NewFromConfig(cfg)
 	s.clientMap[region] = client
+
+	return nil
 }
 
 func (s *Service) ListAllBuckets(ctx context.Context) ([]string, error) {
@@ -98,31 +100,34 @@ func (s *Service) getBucketRegion(ctx context.Context, bucketName string, client
 	return string(locationInfo.LocationConstraint), nil
 }
 
-func (s *Service) getClient(location string) *awsS3.Client {
+func (s *Service) getClient(location string) (*awsS3.Client, error) {
 	if location == "" {
 		for _, c := range s.clientMap {
 			if c != nil {
-				return c
+				return c, nil
 			}
 		}
 	} else {
 		if c, ok := s.clientMap[location]; ok {
-			return c
+			return c, nil
 		}
 	}
 
-	panic("client not initialized")
+	return nil, fmt.Errorf("client not initialized")
 }
 
 func (s *Service) GetBucketRegion(ctx context.Context, bucketList []string) ([]s3.Bucket, error) {
-	client := s.getClient("")
+	client, err := s.getClient("")
+	if err != nil {
+		return nil, err
+	}
 
 	var bucketLocationData []s3.Bucket
-
-	var locErr []struct {
+	type locError struct {
 		err        error
 		bucketName string
 	}
+	var locErr []locError
 	g, groupCtx := errgroup.WithContext(ctx)
 	mutex := &sync.Mutex{}
 	for _, b := range bucketList {
@@ -130,10 +135,7 @@ func (s *Service) GetBucketRegion(ctx context.Context, bucketList []string) ([]s
 		g.Go(func() error {
 			locDetail, err := client.GetBucketLocation(groupCtx, &awsS3.GetBucketLocationInput{Bucket: &bucket})
 			if err != nil {
-				locErr = append(locErr, struct {
-					err        error
-					bucketName string
-				}{err: err, bucketName: bucket})
+				locErr = append(locErr, locError{err: err, bucketName: bucket})
 				return nil
 			}
 
@@ -145,7 +147,9 @@ func (s *Service) GetBucketRegion(ctx context.Context, bucketList []string) ([]s
 			})
 
 			if _, ok := s.clientMap[location]; !ok {
-				s.InitClientWithRegion(location)
+				if err := s.InitClientWithRegion(location); err != nil {
+					locErr = append(locErr, locError{err: err, bucketName: bucket})
+				}
 			}
 			mutex.Unlock()
 			return nil
@@ -170,7 +174,10 @@ func (s *Service) GetBucketRegion(ctx context.Context, bucketList []string) ([]s
 }
 
 func (s *Service) ListFilesInBucket(ctx context.Context, opts model.ListFileOptions) (map[string]int64, error) {
-	client := s.getClient(opts.Region)
+	client, err := s.getClient(opts.Region)
+	if err != nil {
+		return nil, err
+	}
 	bucketFiles := map[string]int64{}
 
 	log.Println("contents of bucket : ", opts.Bucket)
@@ -203,9 +210,8 @@ func (s *Service) ListFilesInBucket(ctx context.Context, opts model.ListFileOpti
 				continue
 			}
 
-			filePath := fmt.Sprintf("/%s/%s", opts.Bucket, aws.ToString(obj.Key))
-
 			isUpdate := false
+			filePath := fmt.Sprintf("/%s", path.Join(opts.Bucket, aws.ToString(obj.Key)))
 			if existingFiles[filePath] != nil {
 				log.Println("duplicate file found with full path: ", filePath)
 				if existingFiles[filePath].Size == obj.Size && existingFiles[filePath].ModifiedAt.Unix() > aws.ToTime(obj.LastModified).Unix() {
@@ -214,8 +220,7 @@ func (s *Service) ListFilesInBucket(ctx context.Context, opts model.ListFileOpti
 				isUpdate = true
 			}
 
-			log.Println("Enqueue this file to be uploaded:", aws.ToString(obj.Key)) //todo: compare with existing files and manage conflicts (skip, replace, rename)
-
+			log.Println("Enqueuing this file to be uploaded:", aws.ToString(obj.Key), "isUpdate:", isUpdate)
 			opts.WaitGroup.Add(1)
 			opts.FileQueue <- model.FileRef{
 				Path:       filePath,
@@ -224,7 +229,7 @@ func (s *Service) ListFilesInBucket(ctx context.Context, opts model.ListFileOpti
 				Key:        aws.ToString(obj.Key),
 				Size:       obj.Size,
 				ModifiedAt: aws.ToTime(obj.LastModified),
-				IsUpdate:   isUpdate, //regular, replace, rename
+				IsUpdate:   isUpdate,
 			}
 		}
 
@@ -234,8 +239,10 @@ func (s *Service) ListFilesInBucket(ctx context.Context, opts model.ListFileOpti
 }
 
 func (s *Service) GetFile(ctx context.Context, opts model.GetFileOptions) (*model.S3Object, error) {
-	log.Println("GetFile : ")
-	client := s.getClient(opts.Region)
+	client, err := s.getClient(opts.Region)
+	if err != nil {
+		return nil, err
+	}
 
 	out, err := client.GetObject(ctx, &awsS3.GetObjectInput{Bucket: aws.String(opts.Bucket), Key: aws.String(opts.Key)})
 	if err != nil {

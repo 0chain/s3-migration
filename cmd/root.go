@@ -53,10 +53,12 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&bSilent, "silent", false, "Do not show interactive sdk logs (shown by default)")
 }
 
-func Execute() {
+func Execute() error {
 	if err := rootCmd.Execute(); err != nil {
-		panic(err)
+		return err
 	}
+
+	return nil
 }
 
 func initConfig() {

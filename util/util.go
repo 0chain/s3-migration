@@ -67,8 +67,8 @@ func GetAwsCredentialsFromFile(credPath string) (accessKey, secretKey string) {
 		return
 	}
 
-	accessKey = v.GetString("aws_access_key_id")
-	secretKey = v.GetString("aws_secret_access_key")
+	accessKey = v.GetString("aws_access_key")
+	secretKey = v.GetString("aws_secret_key")
 
 	return
 }

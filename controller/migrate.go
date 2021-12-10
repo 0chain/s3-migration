@@ -156,7 +156,6 @@ func setExistingFileList(allocationID string) error {
 		if remoteFileValue.ActualSize > 0 {
 			dStorageFileList[remoteFileName] = &model.FileRef{Path: remoteFileName, Size: remoteFileValue.ActualSize, ModifiedAt: time.Now().UTC()}
 			// todo: add updated_by field in GetRemoteFileMap method of go-sdk
-			//dStorageFileList[remoteFileName] = model.FileRef{Path: remoteFileName, Size: remoteFileValue.ActualSize, ModifiedAt: remoteFileValue.UpdatedAt}
 		}
 	}
 
