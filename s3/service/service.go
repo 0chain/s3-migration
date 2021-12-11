@@ -258,3 +258,17 @@ func (s *Service) GetFile(ctx context.Context, opts model.GetFileOptions) (*mode
 
 	return res, nil
 }
+
+func (s *Service) DeleteFile(ctx context.Context, opts model.DeleteFileOptions) error {
+	client, err := s.getClient(opts.Region)
+	if err != nil {
+		return err
+	}
+
+	_, err = client.DeleteObject(ctx, &awsS3.DeleteObjectInput{Bucket: aws.String(opts.Bucket), Key: aws.String(opts.Key)})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

@@ -19,7 +19,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 )
 
 const Batch = 10
@@ -50,20 +49,16 @@ type bucket struct {
 }
 
 type Migration struct {
-	allocation *sdk.Allocation
-	s3Service  s3.S3
-
-	//Slice of map of bucket name and prefix. If prefix is empty string then every object will be uploaded.
+	allocation   *sdk.Allocation
+	s3Service    s3.S3
 	buckets      []bucket //{"bucket1": "prefix1"}
 	bucketStates []map[string]*MigrationState
-
-	resume bool
-	skip   int
-
-	//Number of goroutines to run. So at most concurrency * Batch goroutines will run. i.e. for bucket level and object level
-	concurrency int
-	whoPays     string
-	encrypt     bool
+	resume       bool
+	skip         int
+	concurrency  int
+	whoPays      string
+	encrypt      bool
+	deleteSource bool
 }
 
 func NewMigration() *Migration {
@@ -78,6 +73,7 @@ func (m *Migration) InitMigration(ctx context.Context, allocation *sdk.Allocatio
 	m.resume = appConfig.Resume
 	m.skip = appConfig.Skip
 	m.concurrency = appConfig.Concurrency
+	m.deleteSource = appConfig.DeleteSource
 
 	if len(appConfig.Buckets) == 0 {
 		// list all buckets form s3 and append them to m.buckets
@@ -226,16 +222,30 @@ func (m *Migration) Migrate() error {
 				if err != nil {
 					log.Println(err)
 					//todo: keep an array of failed uploads
+					return
 				}
 
 				uwg.Wait()
 				if !statusBar.Success {
 					fmt.Printf("upload failed. statusbar. success : %v \n", statusBar.Success)
 					//todo: keep an array of failed uploads
+					return
+				}
+
+				if m.deleteSource {
+					err = m.s3Service.DeleteFile(context.Background(), model.DeleteFileOptions{
+						Bucket: migrationFile.Bucket,
+						Region: migrationFile.Region,
+						Key:    migrationFile.Key,
+					})
+
+					if err != nil {
+						fmt.Printf("deleteSource failed. err : %v \n", err)
+						//todo: keep an array of failed uploads
+						return
+					}
 				}
 			}()
-
-			time.Sleep(time.Second)
 		}
 	}()
 

@@ -15,6 +15,7 @@ type AppConfig struct {
 	MigrateToPath string
 	WhoPays       string
 	Encrypt       bool
+	DeleteSource  bool
 }
 
 type FileRef struct {
@@ -34,7 +35,14 @@ type ListFileOptions struct {
 	FileQueue chan FileRef
 	WaitGroup *sync.WaitGroup
 }
+
 type GetFileOptions struct {
+	Bucket string
+	Region string
+	Key    string
+}
+
+type DeleteFileOptions struct {
 	Bucket string
 	Region string
 	Key    string

@@ -19,6 +19,7 @@ var (
 	buckets              []string
 	migrateToPath        string
 	concurrency          int
+	deleteSource         bool
 	encrypt              bool
 	resume               bool
 	skip                 int // 0 --> Replace; 1 --> Skip; 2 --> Duplicate
@@ -46,6 +47,7 @@ func init() {
 	migrateCmd.Flags().StringVar(&awsCredPath, "aws-cred-path", "", "File Path to aws credentials")
 
 	migrateCmd.Flags().IntVar(&concurrency, "concurrency", 10, "number of concurrent files to process concurrently during migration")
+	migrateCmd.Flags().BoolVar(&deleteSource, "delete-source", false, "pass this option to delete migrated source files")
 	migrateCmd.Flags().BoolVar(&resume, "resume", false, "pass this option to resume migration from previous state")
 	migrateCmd.Flags().IntVar(&skip, "skip", 1, "0 --> Replace existing files; 1 --> Skip migration; 2 --> Duplicate")
 }
@@ -118,6 +120,7 @@ var migrateCmd = &cobra.Command{
 			MigrateToPath: migrateToPath,
 			WhoPays:       whoPays,
 			Encrypt:       encrypt,
+			DeleteSource:  deleteSource,
 		}
 
 		migration := controller.NewMigration()
