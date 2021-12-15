@@ -115,14 +115,22 @@ var migrateCmd = &cobra.Command{
 			return fmt.Errorf("skip value not in range 0-2. Provided value is %v", skip)
 		}
 
-		newerThan, err := getTimeFromDHString(newerThanStr)
-		if err != nil {
-			return err
+		var newerThanPtr *time.Time
+		if newerThanStr != "" {
+			newerThan, err := getTimeFromDHString(newerThanStr)
+			if err != nil {
+				return err
+			}
+			newerThanPtr = &newerThan
 		}
 
-		olderThan, err := getTimeFromDHString(olderThanStr)
-		if err != nil {
-			return err
+		var olderThanPtr *time.Time
+		if olderThanStr != "" {
+			olderThan, err := getTimeFromDHString(olderThanStr)
+			if err != nil {
+				return err
+			}
+			olderThanPtr = &olderThan
 		}
 
 		var startAfter string
@@ -163,8 +171,8 @@ var migrateCmd = &cobra.Command{
 			WhoPays:       whoPays,
 			Encrypt:       encrypt,
 			RetryCount:    retryCount,
-			NewerThan:     newerThan,
-			OlderThan:     olderThan,
+			NewerThan:     newerThanPtr,
+			OlderThan:     olderThanPtr,
 			DeleteSource:  deleteSource,
 			StartAfter:    startAfter,
 		}

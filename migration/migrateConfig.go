@@ -13,8 +13,8 @@ type MigrationConfig struct {
 	WhoPays       int
 	Encrypt       bool
 	RetryCount    int
-	NewerThan     time.Time
-	OlderThan     time.Time
+	NewerThan     *time.Time
+	OlderThan     *time.Time
 	DeleteSource  bool
 	StartAfter    string
 }
