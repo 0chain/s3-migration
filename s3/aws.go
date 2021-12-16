@@ -106,15 +106,15 @@ func (a *AwsClient) getBucketRegion() (string, error) {
 	return string(locationInfo.LocationConstraint), nil
 }
 
-func (a *AwsClient) ListFilesInBucket(ctx context.Context) (objectKey chan string, errChan chan error) {
+func (a *AwsClient) ListFilesInBucket(ctx context.Context) (objectKeyChan chan string, errChan chan error) {
 	log.Println("contents of bucket : ", a.bucket)
 
-	objectKey = make(chan string, 10000)
+	objectKeyChan = make(chan string, 10000)
 	errChan = make(chan error)
 
 	go func() {
 		defer func() {
-			close(objectKey)
+			close(objectKeyChan)
 			close(errChan)
 		}()
 
@@ -156,7 +156,7 @@ func (a *AwsClient) ListFilesInBucket(ctx context.Context) (objectKey chan strin
 					continue
 				}
 
-				objectKey <- aws.ToString(obj.Key)
+				objectKeyChan <- aws.ToString(obj.Key)
 			}
 		}
 	}()
