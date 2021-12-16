@@ -14,6 +14,7 @@ import (
 type AwsI interface {
 	ListFilesInBucket(ctx context.Context) (objectKey chan string, errChan chan error)
 	GetFileContent(ctx context.Context, objectKey string) (*Object, error)
+	DeleteFile(ctx context.Context, objectKey string) error
 }
 
 type Object struct {
@@ -174,4 +175,15 @@ func (a *AwsClient) GetFileContent(ctx context.Context, objectKey string) (*Obje
 		ContentType:   aws.ToString(out.ContentType),
 		ContentLength: out.ContentLength,
 	}, nil
+}
+
+func (a *AwsClient) DeleteFile(ctx context.Context, objectKey string) error {
+	if !a.deleteSource {
+		return nil
+	}
+	_, err := a.client.DeleteObject(ctx, &awsS3.DeleteObjectInput{
+		Bucket: aws.String(a.bucket),
+		Key:    aws.String(objectKey),
+	})
+	return err
 }
