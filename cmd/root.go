@@ -19,11 +19,17 @@ import (
 
 	"github.com/0chain/gosdk/zboxcore/sdk"
 	"github.com/0chain/gosdk/zcncore"
+	zlogger "github.com/0chain/s3migration/logger"
 )
 
 var (
-	cfgFile, networkFile, walletFile, walletClientID, walletClientKey, configDir string
-	bSilent, allocUnderRepair                                                    bool
+	cfgFile         string
+	networkFile     string
+	walletFile      string
+	walletClientID  string
+	walletClientKey string
+	configDir       string
+	bSilent         bool
 
 	rootCmd = &cobra.Command{
 		Use:   "s3mgrt",
@@ -47,10 +53,8 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&bSilent, "silent", false, "Do not show interactive sdk logs (shown by default)")
 }
 
-func Execute() {
-	if err := rootCmd.Execute(); err != nil {
-		panic(err)
-	}
+func Execute() error {
+	return rootCmd.Execute()
 }
 
 func initConfig() {
@@ -70,6 +74,7 @@ func initConfig() {
 	// set the log file
 	zcncore.SetLogFile("cmdlog.log", !bSilent)
 	sdk.SetLogFile("cmdlog.log", !bSilent)
+	zlogger.SetLogFile("s3migration.log", !bSilent)
 
 	if network.IsValid() {
 		zcncore.SetNetwork(network.Miners, network.Sharders)

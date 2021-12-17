@@ -13,6 +13,7 @@ import (
 	"github.com/0chain/s3migration/migration"
 	"github.com/spf13/cobra"
 
+	zlogger "github.com/0chain/s3migration/logger"
 	"github.com/0chain/s3migration/util"
 )
 
@@ -23,6 +24,7 @@ var (
 	prefix                     string
 	region                     string
 	migrateToPath              string
+	duplicateSuffix            string
 	concurrency                int
 	encrypt                    bool
 	resume                     bool
@@ -41,7 +43,7 @@ func init() {
 
 	//flags related to dStorage
 	migrateCmd.PersistentFlags().StringVar(&allocationId, "allocation", "", "allocation ID for dStorage")
-	migrateCmd.Flags().StringVar(&allocationTextPath, "alloc-path", "alloc-path", "File Path to allocation text")
+	migrateCmd.Flags().StringVar(&allocationTextPath, "alloc-path", "", "File Path to allocation text")
 	migrateCmd.Flags().BoolVar(&ownerPays, "owner-pays", false, "Read payment source(Default: owner pays)")
 	migrateCmd.Flags().BoolVar(&encrypt, "encrypt", false, "pass this option to encrypt and upload the file")
 	//flags related to s3
@@ -51,6 +53,7 @@ func init() {
 	migrateCmd.PersistentFlags().StringVar(&prefix, "prefix", "", "Migrate objects starting with this prefix")
 	migrateCmd.PersistentFlags().StringVar(&region, "region", "us-east-2", "Bucket location")
 	migrateCmd.Flags().StringVar(&migrateToPath, "migrate-to", "/", "Remote path where buckets will be migrated to")
+	migrateCmd.Flags().StringVar(&duplicateSuffix, "dup-suffix", "_copy", "Duplicate suffix to use for migrated file")
 	migrateCmd.Flags().BoolVar(&deleteSource, "delete-source", false, "Delete object in s3 that is migrated to dStorage")
 	migrateCmd.Flags().StringVar(&awsCredPath, "aws-cred-path", "", "File Path to aws credentials")
 
@@ -75,6 +78,7 @@ var migrateCmd = &cobra.Command{
 	`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cmd.Flags().Parse(args)
+		zlogger.Logger.Info("S3 migration started")
 		var err error
 		if allocationId == "" {
 			if allocationId = util.GetAllocationIDFromEnv(); allocationId == "" {
@@ -113,6 +117,14 @@ var migrateCmd = &cobra.Command{
 
 		if skip < 0 || skip > 2 {
 			return fmt.Errorf("skip value not in range 0-2. Provided value is %v", skip)
+		}
+
+		if duplicateSuffix != "" {
+			if strings.Contains(duplicateSuffix, "/") {
+				return fmt.Errorf("duplicate suffix cannot have path delimiter")
+			}
+		} else {
+			duplicateSuffix = "_copy"
 		}
 
 		var newerThanPtr *time.Time
@@ -161,21 +173,22 @@ var migrateCmd = &cobra.Command{
 		}
 
 		mConfig := migration.MigrationConfig{
-			AllocationID:  allocationId,
-			Region:        region,
-			Skip:          skip,
-			Concurrency:   concurrency,
-			Bucket:        bucket,
-			Prefix:        prefix,
-			MigrateToPath: migrateToPath,
-			WhoPays:       whoPays,
-			Encrypt:       encrypt,
-			RetryCount:    retryCount,
-			NewerThan:     newerThanPtr,
-			OlderThan:     olderThanPtr,
-			DeleteSource:  deleteSource,
-			StartAfter:    startAfter,
-			StateFilePath: stateFilePath,
+			AllocationID:    allocationId,
+			Region:          region,
+			Skip:            skip,
+			Concurrency:     concurrency,
+			Bucket:          bucket,
+			Prefix:          prefix,
+			MigrateToPath:   migrateToPath,
+			DuplicateSuffix: duplicateSuffix,
+			WhoPays:         whoPays,
+			Encrypt:         encrypt,
+			RetryCount:      retryCount,
+			NewerThan:       newerThanPtr,
+			OlderThan:       olderThanPtr,
+			DeleteSource:    deleteSource,
+			StartAfter:      startAfter,
+			StateFilePath:   stateFilePath,
 		}
 
 		if err := migration.InitMigration(&mConfig); err != nil {
@@ -206,23 +219,23 @@ func getTimeFromDHString(s string) (t time.Time, err error) {
 	return
 }
 
-func splitIntoBucketNameAndPrefix(buckets []string) (bucketArr [][2]string, err error) {
-	for _, bkt := range buckets {
-		res := strings.Split(bkt, ":")
-		l := len(res)
-		if l < 1 || l > 2 {
-			err = fmt.Errorf("bucket flag has fields less than 1 or greater than 2. Arg \"%v\"", bkt)
-			return
-		}
+// func splitIntoBucketNameAndPrefix(buckets []string) (bucketArr [][2]string, err error) {
+// 	for _, bkt := range buckets {
+// 		res := strings.Split(bkt, ":")
+// 		l := len(res)
+// 		if l < 1 || l > 2 {
+// 			err = fmt.Errorf("bucket flag has fields less than 1 or greater than 2. Arg \"%v\"", bkt)
+// 			return
+// 		}
 
-		var bucket [2]string
-		bucket[0] = res[0]
+// 		var bucket [2]string
+// 		bucket[0] = res[0]
 
-		if l == 2 {
-			bucket[1] = res[1]
-		}
+// 		if l == 2 {
+// 			bucket[1] = res[1]
+// 		}
 
-		bucketArr = append(bucketArr, bucket)
-	}
-	return
-}
+// 		bucketArr = append(bucketArr, bucket)
+// 	}
+// 	return
+// }
