@@ -4,10 +4,14 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 
+	zerror "github.com/0chain/errors"
 	dStorage "github.com/0chain/s3migration/dstorage"
+	zlogger "github.com/0chain/s3migration/logger"
 	"github.com/0chain/s3migration/s3"
+	migError "github.com/0chain/s3migration/zErrors"
 )
 
 const Batch = 10
@@ -36,23 +40,24 @@ type Migration struct {
 	zStore   dStorage.DStoreI
 	awsStore s3.AwsI
 
-	//Slice of map of bucket name and prefix. If prefix is empty string then every object will be uploaded.
-	//If buckets is empty; migrate all buckets
-	bucketStates []map[string]*MigrationState
-
 	skip       int
 	retryCount int
 
 	//Number of goroutines to run. So at most concurrency * Batch goroutines will run. i.e. for bucket level and object level
 	concurrency int
 
-	migratedSize uint64
+	szCtMu               sync.Mutex //size and count mutex; used to update migratedSize and totalMigratedObjects
+	migratedSize         uint64
+	totalMigratedObjects uint64
 
 	stateFilePath string
+	migrateTo     string
+	deleteSource  bool
 }
 
 func InitMigration(mConfig *MigrationConfig) error {
-	dStorageService, err := dStorage.GetDStorageService(mConfig.AllocationID, mConfig.MigrateToPath, mConfig.Encrypt, mConfig.WhoPays)
+	_ = zlogger.Logger
+	dStorageService, err := dStorage.GetDStorageService(mConfig.AllocationID, mConfig.MigrateToPath, mConfig.DuplicateSuffix, mConfig.Encrypt, mConfig.WhoPays)
 	if err != nil {
 		return err
 	}
@@ -77,6 +82,8 @@ func InitMigration(mConfig *MigrationConfig) error {
 		concurrency:   mConfig.Concurrency,
 		retryCount:    mConfig.RetryCount,
 		stateFilePath: mConfig.StateFilePath,
+		migrateTo:     mConfig.MigrateToPath,
+		deleteSource:  mConfig.DeleteSource,
 	}
 
 	rootContext, rootContextCancel = context.WithCancel(context.Background())
@@ -86,51 +93,10 @@ func InitMigration(mConfig *MigrationConfig) error {
 	return nil
 }
 
-type objectUploadStatus struct {
-	name       string
-	isUploaded <-chan struct{}
-	errCh      <-chan error
-}
-
-//MigrationState is state for each bucket.
-type MigrationState struct {
-	bucketName string
-
-	uploadsInProgress [Batch]objectUploadStatus //Array that holds each objects status on successful upload or error
-
-	//Migration is done in sorted order.
-	//This key provides information that upto this key all the files are migrated.
-	uptoKey string
-}
-
-func (ms *MigrationState) cleanBatch() {
-	var errorNoticed bool
-	for i := 0; i < Batch; i++ {
-		oups := ms.uploadsInProgress[i]
-		select {
-		case <-oups.isUploaded:
-			//Successfully uploaded
-		case <-oups.errCh:
-			errorNoticed = true
-			//error occurred.
-		}
-	}
-
-	if errorNoticed {
-		//Stop migration from this bucket.
-		//Save state in some file
-	}
-}
-
-func (ms *MigrationState) saveState() {
-	//Write its state to the file
-	//Check objectUploadStatus
-}
-
 type migratingObjStatus struct {
 	objectKey string
 	successCh chan struct{}
-	errCh     chan error
+	errCh     chan error //should be of type zerror
 }
 
 func Migrate() error {
@@ -140,32 +106,39 @@ func Migrate() error {
 		return fmt.Errorf("migration is not initialized")
 	}
 
-	updateState, err := updateStateKey(migration.stateFilePath)
+	updateState, closeStateFile, err := updateStateKeyFunc(migration.stateFilePath)
 	if err != nil {
 		return fmt.Errorf("could not create state file path. Error: %v", err)
 	}
-	objCh, _ := migration.awsStore.ListFilesInBucket(rootContext)
+
+	objCh, errCh := migration.awsStore.ListFilesInBucket(rootContext)
 	// if err != nil {
 	// 	return err
 	// }
 
 	count := 0
-	batchCount := 1
+	batchCount := 0
 	wg := sync.WaitGroup{}
 
 	migrationStatuses := make([]*migratingObjStatus, 10)
-	for _, ms := range migrationStatuses {
-		ms.successCh = make(chan struct{}, 1)
-		ms.errCh = make(chan error, 1)
-	}
+	// makeMigrationStatuses := func() {
+	// 	for _, ms := range migrationStatuses {
+	// 		ms.successCh = make(chan struct{}, 1)
+	// 		ms.errCh = make(chan error, 1)
+	// 	}
+	// }
 
+	// makeMigrationStatuses()
+
+	//TODO obj is not string but struct as it requires both object name and size
 	for obj := range objCh {
 		status := migrationStatuses[count]
+		status.objectKey = obj
+		status.successCh = make(chan struct{}, 1)
+		status.errCh = make(chan error, 1)
 		wg.Add(1)
 
-		go func(status *migratingObjStatus, obj interface{}) {
-			defer wg.Done()
-		}(status, obj)
+		go migrateObject(&wg, obj, status, rootContext)
 
 		count++
 
@@ -184,14 +157,39 @@ func Migrate() error {
 			//log statekey
 			updateState(stateKey)
 			count = 0
+			// makeMigrationStatuses()
 		}
 
 	}
-	wg.Wait()
+
+	if count != 0 { //last batch that is not multiple of 10
+		batchCount++
+		wg.Wait()
+		stateKey, unresolvedError := checkStatuses(migrationStatuses[:count])
+		if unresolvedError {
+			zlogger.Logger.Error("Check for unresolved errors")
+		}
+
+		updateState(stateKey)
+
+	}
+
+	zlogger.Logger.Info("Total migrated objects: ", migration.totalMigratedObjects)
+	zlogger.Logger.Info("Total migrated size: ", migration.migratedSize)
+
+	select {
+	case err := <-errCh:
+		zlogger.Logger.Error("Could not fetch all objects. Error: ", err)
+	default:
+		zlogger.Logger.Info("Got object from s3 without error")
+	}
+
+	closeStateFile()
 	return nil
 }
 
 func checkStatuses(statuses []*migratingObjStatus) (stateKey string, unresolvedError bool) {
+outerloop:
 	for _, mgrtStatus := range statuses {
 		select {
 		case <-mgrtStatus.successCh:
@@ -203,11 +201,10 @@ func checkStatuses(statuses []*migratingObjStatus) (stateKey string, unresolvedE
 				stateKey = mgrtStatus.objectKey
 				unresolvedError = false
 			} else {
-				break
+				break outerloop
 			}
 		}
 	}
-
 	return
 }
 
@@ -219,13 +216,13 @@ func resolveError(objectKey string, err error) (isErrorResolved bool) {
 	return
 }
 
-func updateStateKey(statePath string) (func(stateKey string), error) {
+func updateStateKeyFunc(statePath string) (func(stateKey string), func(), error) {
 	f, err := os.Create(statePath)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var errorWhileWriting bool
-	return func(stateKey string) {
+	stateKeyUpdater := func(stateKey string) {
 		if errorWhileWriting {
 			f, err = os.Create(statePath)
 			if err != nil {
@@ -253,5 +250,67 @@ func updateStateKey(statePath string) (func(stateKey string), error) {
 		if err != nil {
 			errorWhileWriting = true
 		}
-	}, nil
+	}
+
+	fileCloser := func() { f.Close() }
+
+	return stateKeyUpdater, fileCloser, nil
+}
+
+func migrateObject(wg *sync.WaitGroup, objectKey string, status *migratingObjStatus, ctx context.Context) {
+	defer wg.Done()
+
+	remotePath := filepath.Join(migration.migrateTo, objectKey)
+
+	dMeta, err := migration.zStore.GetFileMetaData(ctx, remotePath)
+	var isFileExist bool
+
+	if zerror.Is(err, migError.ErrFileNoExist) {
+	} else if err != nil {
+		zlogger.Logger.Error(err)
+		status.errCh <- err
+		return
+	} else {
+		if dMeta != nil {
+			isFileExist = true
+		}
+	}
+
+	if isFileExist && migration.skip == Skip {
+		zlogger.Logger.Info("Skipping migration of object" + objectKey)
+		status.successCh <- struct{}{}
+		return
+	}
+
+	obj, err := migration.awsStore.GetFileContent(ctx, objectKey)
+	if err != nil {
+		status.errCh <- err
+		return
+	}
+
+	//TODO size should be from aws list objects
+	if isFileExist {
+		switch migration.skip {
+		case Replace:
+			err = migration.zStore.Replace(ctx, remotePath, obj.Body, 0)
+		case Duplicate:
+			err = migration.zStore.Duplicate(ctx, remotePath, obj.Body, 0)
+		}
+	} else {
+		err = migration.zStore.Upload(ctx, remotePath, obj.Body, 0)
+	}
+
+	if err != nil {
+		status.errCh <- err
+	} else {
+		status.successCh <- struct{}{}
+		migration.szCtMu.Lock()
+		migration.migratedSize += 0
+		migration.totalMigratedObjects++
+		migration.szCtMu.Unlock()
+		if migration.deleteSource {
+			migration.awsStore.DeleteFile(ctx, objectKey)
+		}
+	}
+
 }
