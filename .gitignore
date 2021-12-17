@@ -22,3 +22,5 @@ s3-migration
 #ide
 .idea
 .vscode
+.gitignore
+s3migration
