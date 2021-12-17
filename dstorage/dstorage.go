@@ -1,9 +1,6 @@
 package dStorage
 
 import (
-	"context"
-	"io"
-
 	"github.com/0chain/gosdk/core/common"
 	"github.com/0chain/gosdk/zboxcore/sdk"
 )
@@ -22,11 +19,12 @@ import (
 //So lets put commit request in a queue(use channel) and try three times. If it fails to commit then save state of all bucket and abort the program.
 
 type DStoreI interface {
-	GetFileMetaData(ctx context.Context, remotepath string) (*sdk.ORef, error)
-	Replace(ctx context.Context, remotepath string, r io.Reader, size int64) error
-	Duplicate(ctx context.Context, remotepath string, r io.Reader, size int64) error
-	Upload(ctx context.Context, remotepath string, r io.Reader, size int64) error
-	IsFileExist(ctx context.Context, remotepath string) bool
+	Download()
+	GetFileMetaData()
+	Delete()
+	Replace()
+	Duplicate()
+	IsFileExist(fPath string) bool
 	GetAvailableSpace() uint64
 	GetTotalSpace() uint64
 }
@@ -37,34 +35,31 @@ type DStorageService struct {
 	//After file is available in dStorage owner can decide who is going to pay for read
 	whoPays common.WhoPays
 	//Where to migrate all buckets to. Default is /
-	migrateTo string
-	//Duplicate suffix to use if file already exists in dStorage. So if remotepath if /path/to/remote/file.txt
-	//then duplicate path should be /path/to/remote/file{duplicateSuffix}.txt
-	duplicateSuffix string
-	availableSpace  uint64
-	totalSpace      uint64
+	migrateTo      string
+	availableSpace uint64
+	totalSpace     uint64
 }
 
-func (d *DStorageService) GetFileMetaData(ctx context.Context, remotepath string) (*sdk.ORef, error) {
-	//if error is nil and ref too is nil then it means remoepath does not exist.
-	//in this case return error with code from error.go
-	return nil, nil
+func (d *DStorageService) Download() {
+
+}
+func (d *DStorageService) GetFileMetaData() {
+
 }
 
-func (d *DStorageService) Upload(ctx context.Context, remotepath string, r io.Reader, size int64) error {
-	return nil
+func (d *DStorageService) Delete() {
+
 }
 
-func (d *DStorageService) Replace(ctx context.Context, remotepath string, r io.Reader, size int64) error {
-	return nil
+func (d *DStorageService) Replace() {
+
 }
 
-func (d *DStorageService) Duplicate(ctx context.Context, remotepath string, r io.Reader, size int64) error {
-	_ = d.duplicateSuffix
-	return nil
+func (d *DStorageService) Duplicate() {
+
 }
 
-func (d *DStorageService) IsFileExist(ctx context.Context, remotepath string) bool {
+func (d *DStorageService) IsFileExist(fPath string) bool {
 	return false
 }
 
@@ -77,7 +72,7 @@ func (d *DStorageService) GetTotalSpace() uint64 {
 	return d.totalSpace
 }
 
-func GetDStorageService(allocationID, migrateTo, duplicateSuffix string, encrypt bool, whoPays int) (*DStorageService, error) {
+func GetDStorageService(allocationID, migrateTo string, encrypt bool, whoPays int) (*DStorageService, error) {
 	allocation, err := sdk.GetAllocation(allocationID)
 
 	if err != nil {
