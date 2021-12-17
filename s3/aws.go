@@ -12,7 +12,7 @@ import (
 )
 
 type AwsI interface {
-	ListFilesInBucket(ctx context.Context) (objectKey chan string, errChan chan error)
+	ListFilesInBucket(ctx context.Context) (objectMetaChan chan ObjectMeta, errChan chan error)
 	GetFileContent(ctx context.Context, objectKey string) (*Object, error)
 	DeleteFile(ctx context.Context, objectKey string) error
 }
@@ -21,6 +21,12 @@ type Object struct {
 	Body          io.Reader
 	ContentType   string
 	ContentLength int64
+}
+
+// ObjectMeta key: object key, size: size of object in bytes
+type ObjectMeta struct {
+	Key  string
+	Size int64
 }
 
 type AwsClient struct {
@@ -107,15 +113,15 @@ func (a *AwsClient) getBucketRegion() (string, error) {
 	return string(locationInfo.LocationConstraint), nil
 }
 
-func (a *AwsClient) ListFilesInBucket(ctx context.Context) (objectKeyChan chan string, errChan chan error) {
+func (a *AwsClient) ListFilesInBucket(ctx context.Context) (objectMetaChan chan ObjectMeta, errChan chan error) {
 	log.Println("contents of bucket : ", a.bucket)
 
-	objectKeyChan = make(chan string, 10000)
+	objectMetaChan = make(chan ObjectMeta, 10000)
 	errChan = make(chan error)
 
 	go func() {
 		defer func() {
-			close(objectKeyChan)
+			close(objectMetaChan)
 			close(errChan)
 		}()
 
@@ -157,7 +163,7 @@ func (a *AwsClient) ListFilesInBucket(ctx context.Context) (objectKeyChan chan s
 					continue
 				}
 
-				objectKeyChan <- aws.ToString(obj.Key)
+				objectMetaChan <- ObjectMeta{Key: aws.ToString(obj.Key), Size: obj.Size}
 			}
 		}
 	}()
