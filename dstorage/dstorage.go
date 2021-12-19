@@ -62,32 +62,33 @@ const (
 	TenMB            = 10 * OneMB
 	HundredMB        = 10 * TenMB
 
-	RetryWaitTime = 500 * time.Millisecond // milliseconds
+	GetRefRetryWaitTime = 500 * time.Millisecond
+	GetRefRetryCount    = 2
 )
 
 func (d *DStorageService) GetFileMetaData(ctx context.Context, remotePath string) (*sdk.ORef, error) {
 	//if error is nil and ref too is nil then it means remoepath does not exist.
 	//in this case return error with code from error.go
 	level := len(strings.Split(strings.TrimSuffix(remotePath, "/"), "/"))
-	oREsult, err := d.allocation.GetRefs(remotePath, "", "", "", "", "regular", level, 1)
-	if err != nil {
+	var oResult *sdk.ObjectTreeResult
+	var err error
+	for retryCount := 1; retryCount <= GetRefRetryCount; retryCount++ {
+		oResult, err = d.allocation.GetRefs(remotePath, "", "", "", "", "regular", level, 1)
+		if err == nil {
+			break
+		}
 		if zerror.IsConsensusFailedError(err) {
-			time.Sleep(RetryWaitTime)
-			//log retrying again
-			oREsult, err = d.allocation.GetRefs(remotePath, "", "", "", "", "regular", level, 1)
-			if err != nil {
-				return nil, err
-			}
+			time.Sleep(GetRefRetryWaitTime)
 		} else {
 			return nil, err
 		}
 	}
 
-	if len(oREsult.Refs) == 0 {
+	if len(oResult.Refs) == 0 {
 		return nil, zerror.ErrFileNoExist
 	}
 
-	return &oREsult.Refs[0], nil
+	return &oResult.Refs[0], nil
 }
 
 func getChunkSize(size int64) int64 {
