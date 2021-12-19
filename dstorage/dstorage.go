@@ -190,7 +190,7 @@ func (d *DStorageService) Duplicate(ctx context.Context, remotePath string, r io
 func (d *DStorageService) IsFileExist(ctx context.Context, remotePath string) (bool, error) {
 	_, err := d.GetFileMetaData(ctx, remotePath)
 	if err != nil {
-		if err == zerror.ErrFileNoExist {
+		if zerror.IsFileNotExistError(err) {
 			return false, nil
 		}
 		return false, err
