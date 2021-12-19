@@ -17,3 +17,17 @@ var (
 	ErrConsensusFailed       = zerror.New(ConsensusFailedErrCode, "")
 	ErrTransactionValidation = zerror.New(TransactionValidationFailedErrCode, "")
 )
+
+func IsConsensusFailedError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	switch err := err.(type) {
+	case *zerror.Error:
+		if err.Code == ConsensusFailedErrCode {
+			return true
+		}
+	}
+	return false
+}
