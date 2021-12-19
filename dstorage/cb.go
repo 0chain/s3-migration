@@ -10,6 +10,7 @@ import (
 type StatusCB struct {
 	wg      *sync.WaitGroup
 	success bool
+	err     error
 }
 
 func (s *StatusCB) Started(allocationId, filePath string, op int, totalBytes int) {
@@ -22,12 +23,11 @@ func (s *StatusCB) Error(allocationID string, filePath string, op int, err error
 	s.success = false
 	defer s.wg.Done()
 
-	var errDetail interface{} = "Unknown Error"
 	if err != nil {
-		errDetail = err.Error()
+		s.err = err
 	}
 
-	PrintError("Error in file operation:", errDetail)
+	PrintError("Error in file operation:", err)
 }
 
 func (s *StatusCB) Completed(allocationId, filePath string, filename string, mimetype string, size int, op int) {

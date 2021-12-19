@@ -121,6 +121,10 @@ func (d *DStorageService) Upload(ctx context.Context, remotePath string, r io.Re
 	}
 	cb.wg.Wait()
 	if !cb.success {
+		err = errors.New("upload failed")
+		if cb.err != nil {
+			err = cb.err
+		}
 		return errors.New("upload failed")
 	}
 
