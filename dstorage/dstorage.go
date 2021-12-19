@@ -62,7 +62,7 @@ const (
 	TenMB            = 10 * OneMB
 	HundredMB        = 10 * TenMB
 
-	RetryWaitTime    = 500 * time.Millisecond // milliseconds
+	RetryWaitTime = 500 * time.Millisecond // milliseconds
 )
 
 func (d *DStorageService) GetFileMetaData(ctx context.Context, remotePath string) (*sdk.ORef, error) {
