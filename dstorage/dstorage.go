@@ -2,11 +2,13 @@ package dStorage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/0chain/gosdk/zboxcore/fileref"
 	"github.com/0chain/s3migration/util"
@@ -86,8 +88,7 @@ func getChunkSize(size int64) int64 {
 
 func (d *DStorageService) Upload(ctx context.Context, remotePath string, r io.Reader, size int64, contentType string, isUpdate bool) error {
 	cb := &StatusCB{
-		DoneCh: make(chan struct{}, 1),
-		ErrCh:  make(chan error, 1),
+		wg: &sync.WaitGroup{},
 	}
 
 	attrs := fileref.Attributes{
@@ -103,6 +104,7 @@ func (d *DStorageService) Upload(ctx context.Context, remotePath string, r io.Re
 	}
 
 	chunkSize := getChunkSize(size)
+	cb.wg.Add(1)
 	chunkUpload, err := sdk.CreateChunkedUpload(d.workDir, d.allocation, fileMeta, util.NewStreamReader(r), isUpdate, false,
 		sdk.WithStatusCallback(cb),
 		sdk.WithChunkSize(chunkSize),
@@ -117,7 +119,27 @@ func (d *DStorageService) Upload(ctx context.Context, remotePath string, r io.Re
 	if err != nil {
 		return err
 	}
+	cb.wg.Wait()
+	if !cb.success {
+		return errors.New("upload failed")
+	}
 
+	cb.wg.Add(1)
+	err = d.commitMetaTxn(remotePath, "Update", "", "", nil, cb)
+	cb.wg.Wait()
+
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (d *DStorageService) commitMetaTxn(path, crudOp, authTicket, lookupHash string, fileMeta *sdk.ConsolidatedFileMeta, status *StatusCB) error {
+	err := d.allocation.CommitMetaTransaction(path, crudOp, authTicket, lookupHash, fileMeta, status)
+	if err != nil {
+		PrintError("Commit failed.", err)
+		return err
+	}
 	return nil
 }
 
