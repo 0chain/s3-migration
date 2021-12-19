@@ -2,13 +2,11 @@ package dStorage
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/0chain/s3migration/util"
@@ -110,8 +108,9 @@ func getChunkSize(size int64) int64 {
 }
 
 func (d *DStorageService) Upload(ctx context.Context, remotePath string, r io.Reader, size int64, contentType string, isUpdate bool) error {
-	cb := &StatusCB{
-		wg: &sync.WaitGroup{},
+	cb := &statusCB{
+		doneCh: make(chan struct{}),
+		errCh:  make(chan error),
 	}
 
 	attrs := fileref.Attributes{
@@ -127,7 +126,6 @@ func (d *DStorageService) Upload(ctx context.Context, remotePath string, r io.Re
 	}
 
 	chunkSize := getChunkSize(size)
-	cb.wg.Add(1)
 	chunkUpload, err := sdk.CreateChunkedUpload(d.workDir, d.allocation, fileMeta, util.NewStreamReader(r), isUpdate, false,
 		sdk.WithStatusCallback(cb),
 		sdk.WithChunkSize(chunkSize),
@@ -142,29 +140,32 @@ func (d *DStorageService) Upload(ctx context.Context, remotePath string, r io.Re
 	if err != nil {
 		return err
 	}
-	cb.wg.Wait()
-	if !cb.success {
-		err = errors.New("upload failed")
-		if cb.err != nil {
-			err = cb.err
-		}
-		return errors.New("upload failed")
-	}
 
-	cb.wg.Add(1)
-	err = d.commitMetaTxn(remotePath, "Update", "", "", nil, cb)
-	cb.wg.Wait()
+	select {
+	case <-cb.doneCh:
+	case err = <-cb.errCh:
+	}
 
 	if err != nil {
 		return err
 	}
+
+	err = d.commitMetaTxn(remotePath, "Update", "", "", nil, cb)
+	if err != nil {
+		return err
+	}
+
+	select {
+	case <-cb.doneCh:
+	case err = <-cb.errCh:
+	}
+
 	return nil
 }
 
-func (d *DStorageService) commitMetaTxn(path, crudOp, authTicket, lookupHash string, fileMeta *sdk.ConsolidatedFileMeta, status *StatusCB) error {
+func (d *DStorageService) commitMetaTxn(path, crudOp, authTicket, lookupHash string, fileMeta *sdk.ConsolidatedFileMeta, status *statusCB) error {
 	err := d.allocation.CommitMetaTransaction(path, crudOp, authTicket, lookupHash, fileMeta, status)
 	if err != nil {
-		PrintError("Commit failed.", err)
 		return err
 	}
 	return nil
