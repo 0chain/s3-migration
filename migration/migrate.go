@@ -7,11 +7,9 @@ import (
 	"path/filepath"
 	"sync"
 
-	zerror "github.com/0chain/errors"
 	dStorage "github.com/0chain/s3migration/dstorage"
 	zlogger "github.com/0chain/s3migration/logger"
 	"github.com/0chain/s3migration/s3"
-	migError "github.com/0chain/s3migration/zErrors"
 )
 
 const Batch = 10
@@ -272,18 +270,12 @@ func migrateObject(wg *sync.WaitGroup, objMeta *s3.ObjectMeta, status *migrating
 
 	remotePath := filepath.Join(migration.migrateTo, objMeta.Key)
 
-	dMeta, err := migration.zStore.GetFileMetaData(ctx, remotePath)
-	var isFileExist bool
+	isFileExist, err := migration.zStore.IsFileExist(ctx, remotePath)
 
-	if zerror.Is(err, migError.ErrFileNoExist) {
-	} else if err != nil {
+	if err != nil {
 		zlogger.Logger.Error(err)
 		status.errCh <- err
 		return
-	} else {
-		if dMeta != nil {
-			isFileExist = true
-		}
 	}
 
 	if isFileExist && migration.skip == Skip {
