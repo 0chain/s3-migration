@@ -8,8 +8,8 @@ import (
 )
 
 type StatusCB struct {
-	wg               *sync.WaitGroup
-	success          bool
+	wg      *sync.WaitGroup
+	success bool
 }
 
 func (s *StatusCB) Started(allocationId, filePath string, op int, totalBytes int) {
