@@ -151,24 +151,6 @@ func (d *DStorageService) Upload(ctx context.Context, remotePath string, r io.Re
 		return err
 	}
 
-	err = d.commitMetaTxn(remotePath, "Update", "", "", nil, cb)
-	if err != nil {
-		return err
-	}
-
-	select {
-	case <-cb.doneCh:
-	case err = <-cb.errCh:
-	}
-
-	return nil
-}
-
-func (d *DStorageService) commitMetaTxn(path, crudOp, authTicket, lookupHash string, fileMeta *sdk.ConsolidatedFileMeta, status *statusCB) error {
-	err := d.allocation.CommitMetaTransaction(path, crudOp, authTicket, lookupHash, fileMeta, status)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
