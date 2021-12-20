@@ -108,7 +108,7 @@ func getChunkSize(size int64) int64 {
 	return chunkSize
 }
 
-func (d *DStorageService) Upload(ctx context.Context, remotePath string, r io.Reader, size int64, contentType string, isUpdate bool) error {
+func (d *DStorageService) Upload(ctx context.Context, remotePath string, r io.Reader, size int64, contentType string, isUpdate bool) (err error) {
 	cb := &statusCB{
 		doneCh: make(chan struct{}),
 		errCh:  make(chan error),
@@ -134,12 +134,12 @@ func (d *DStorageService) Upload(ctx context.Context, remotePath string, r io.Re
 	)
 
 	if err != nil {
-		return err
+		return
 	}
 
 	err = chunkUpload.Start()
 	if err != nil {
-		return err
+		return
 	}
 
 	select {
@@ -147,11 +147,7 @@ func (d *DStorageService) Upload(ctx context.Context, remotePath string, r io.Re
 	case err = <-cb.errCh:
 	}
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return
 }
 
 func (d *DStorageService) Replace(ctx context.Context, remotePath string, r io.Reader, size int64, contentType string) error {
@@ -160,10 +156,8 @@ func (d *DStorageService) Replace(ctx context.Context, remotePath string, r io.R
 
 func (d *DStorageService) Duplicate(ctx context.Context, remotePath string, r io.Reader, size int64, contentType string) error {
 	li := strings.LastIndex(remotePath, ".")
-	if li == -1 {
+	if li == -1 || li == 0 {
 		remotePath = fmt.Sprintf("%s%s", remotePath, d.duplicateSuffix)
-	} else if li == 0 {
-		remotePath = fmt.Sprintf("%s%s", d.duplicateSuffix, remotePath)
 	} else {
 		remotePath = fmt.Sprintf("%s%s.%s", remotePath[:li], d.duplicateSuffix, remotePath[li+1:])
 	}
