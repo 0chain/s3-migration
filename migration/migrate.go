@@ -290,7 +290,6 @@ func migrateObject(wg *sync.WaitGroup, objMeta *s3.ObjectMeta, status *migrating
 		return
 	}
 
-	//TODO size should be from aws list objects
 	if isFileExist {
 		switch migration.skip {
 		case Replace:
@@ -307,12 +306,12 @@ func migrateObject(wg *sync.WaitGroup, objMeta *s3.ObjectMeta, status *migrating
 	} else {
 		status.successCh <- struct{}{}
 		migration.szCtMu.Lock()
-		migration.migratedSize += 0
+		migration.migratedSize += uint64(objMeta.Size)
 		migration.totalMigratedObjects++
 		migration.szCtMu.Unlock()
+
 		if migration.deleteSource {
 			migration.awsStore.DeleteFile(ctx, objMeta.Key)
 		}
 	}
-
 }
