@@ -165,7 +165,6 @@ func Migrate() error {
 			//log statekey
 			updateState(stateKey)
 			count = 0
-			// makeMigrationStatuses()
 		}
 
 	}
@@ -197,7 +196,6 @@ func Migrate() error {
 }
 
 func checkStatuses(statuses []*migratingObjStatus) (stateKey string, unresolvedError bool) {
-outerloop:
 	for _, mgrtStatus := range statuses {
 		select {
 		case <-mgrtStatus.successCh:
@@ -209,7 +207,7 @@ outerloop:
 				stateKey = mgrtStatus.objectKey
 				unresolvedError = false
 			} else {
-				break outerloop
+				return
 			}
 		}
 	}
