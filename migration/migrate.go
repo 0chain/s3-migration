@@ -159,6 +159,7 @@ func Migrate() error {
 			if unresolvedError {
 				//break migration
 				abandonAllOperations()
+				break
 			}
 
 			//log statekey
