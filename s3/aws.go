@@ -64,7 +64,7 @@ func GetAwsClient(bucket, prefix, region string, deleteSource bool, newerThan, o
 		region = "us-east-1"
 	}
 	workDir = filepath.Join(workDir, "s3")
-	if err := os.MkdirAll(workDir, 0644); err != nil {
+	if err := os.MkdirAll(workDir, 0755); err != nil {
 		return nil, err
 	}
 

@@ -198,7 +198,7 @@ func GetDStorageService(allocationID, migrateTo, duplicateSuffix, workDir string
 	}
 
 	workDir = filepath.Join(workDir, "zstore")
-	if err := os.MkdirAll(workDir, 0644); err != nil {
+	if err := os.MkdirAll(workDir, 0755); err != nil {
 		return nil, err
 	}
 

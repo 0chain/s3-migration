@@ -120,23 +120,22 @@ func Migrate() error {
 	}
 
 	objCh, errCh := migration.awsStore.ListFilesInBucket(rootContext)
-	// if err != nil {
-	// 	return err
-	// }
 
 	count := 0
 	batchCount := 0
 	wg := sync.WaitGroup{}
 
 	migrationStatuses := make([]*migratingObjStatus, 10)
-	// makeMigrationStatuses := func() {
-	// 	for _, ms := range migrationStatuses {
-	// 		ms.successCh = make(chan struct{}, 1)
-	// 		ms.errCh = make(chan error, 1)
-	// 	}
-	// }
+	makeMigrationStatuses := func() {
+		for i := 0; i < 10; i++ {
+			ms := &migratingObjStatus{}
+			ms.successCh = make(chan struct{}, 1)
+			ms.errCh = make(chan error, 1)
+			migrationStatuses[i] = ms
+		}
+	}
 
-	// makeMigrationStatuses()
+	makeMigrationStatuses()
 
 	//TODO obj is not string but struct as it requires both object name and size
 	for obj := range objCh {
@@ -184,10 +183,9 @@ func Migrate() error {
 	zlogger.Logger.Info("Total migrated objects: ", migration.totalMigratedObjects)
 	zlogger.Logger.Info("Total migrated size: ", migration.migratedSize)
 
-	select {
-	case err := <-errCh:
+	if err, ok := <-errCh; ok {
 		zlogger.Logger.Error("Could not fetch all objects. Error: ", err)
-	default:
+	} else {
 		zlogger.Logger.Info("Got object from s3 without error")
 	}
 
@@ -284,6 +282,7 @@ func migrateObject(wg *sync.WaitGroup, objMeta *s3.ObjectMeta, status *migrating
 
 	obj, err := migration.awsStore.GetFileContent(ctx, objMeta.Key)
 	if err != nil {
+		zlogger.Logger.Error(err)
 		status.errCh <- err
 		return
 	}
@@ -300,6 +299,7 @@ func migrateObject(wg *sync.WaitGroup, objMeta *s3.ObjectMeta, status *migrating
 	}
 
 	if err != nil {
+		zlogger.Logger.Error(err)
 		status.errCh <- err
 	} else {
 		status.successCh <- struct{}{}
