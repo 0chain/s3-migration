@@ -110,8 +110,8 @@ func getChunkSize(size int64) int64 {
 
 func (d *DStorageService) Upload(ctx context.Context, remotePath string, r io.Reader, size int64, contentType string, isUpdate bool) (err error) {
 	cb := &statusCB{
-		doneCh: make(chan struct{}),
-		errCh:  make(chan error),
+		doneCh: make(chan struct{}, 1),
+		errCh:  make(chan error, 1),
 	}
 
 	attrs := fileref.Attributes{
