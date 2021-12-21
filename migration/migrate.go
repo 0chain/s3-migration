@@ -159,6 +159,7 @@ func Migrate() error {
 			if unresolvedError {
 				//break migration
 				abandonAllOperations()
+				count = 0
 				break
 			}
 
@@ -184,10 +185,15 @@ func Migrate() error {
 	zlogger.Logger.Info("Total migrated objects: ", migration.totalMigratedObjects)
 	zlogger.Logger.Info("Total migrated size: ", migration.migratedSize)
 
-	if err, ok := <-errCh; ok {
-		zlogger.Logger.Error("Could not fetch all objects. Error: ", err)
-	} else {
-		zlogger.Logger.Info("Got object from s3 without error")
+	select {
+	case err := <-errCh:
+		if err != nil {
+			zlogger.Logger.Error("Could not fetch all objects. Error: ", err)
+		} else {
+			zlogger.Logger.Info("Got object from s3 without error")
+		}
+	case <-rootContext.Done():
+		zlogger.Logger.Error("Could not fetch all objects. Error: context cancelled")
 	}
 
 	closeStateFile()
@@ -210,6 +216,7 @@ func checkStatuses(statuses []*migratingObjStatus) (stateKey string, unresolvedE
 			}
 		}
 	}
+
 	return
 }
 
