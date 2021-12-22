@@ -128,16 +128,12 @@ func Migrate() error {
 	migrationStatuses := make([]*migratingObjStatus, 10)
 	makeMigrationStatuses := func() {
 		for i := 0; i < 10; i++ {
-			ms := &migratingObjStatus{}
-			ms.successCh = make(chan struct{}, 1)
-			ms.errCh = make(chan error, 1)
-			migrationStatuses[i] = ms
+			migrationStatuses[i] = new(migratingObjStatus)
 		}
 	}
 
 	makeMigrationStatuses()
 
-	//TODO obj is not string but struct as it requires both object name and size
 	for obj := range objCh {
 		status := migrationStatuses[count]
 		status.objectKey = obj.Key
