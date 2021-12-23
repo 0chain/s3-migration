@@ -46,7 +46,7 @@ func init() {
 	//flags related to dStorage
 	migrateCmd.PersistentFlags().StringVar(&allocationId, "allocation", "", "allocation ID for dStorage")
 	migrateCmd.Flags().StringVar(&allocationTextPath, "alloc-path", "", "File Path to allocation text")
-	migrateCmd.Flags().BoolVar(&ownerPays, "owner-pays", false, "Read payment source(Default: owner pays)")
+	migrateCmd.Flags().BoolVar(&ownerPays, "owner-pays", true, "Read payment source(Default: owner pays)")
 	migrateCmd.Flags().BoolVar(&encrypt, "encrypt", false, "pass this option to encrypt and upload the file")
 	//flags related to s3
 	migrateCmd.PersistentFlags().StringVar(&accessKey, "access-key", "", "access-key of aws")
