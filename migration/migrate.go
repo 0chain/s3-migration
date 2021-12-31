@@ -15,6 +15,7 @@ import (
 	zlogger "github.com/0chain/s3migration/logger"
 	"github.com/0chain/s3migration/s3"
 	"github.com/0chain/s3migration/util"
+	zerror "github.com/0chain/s3migration/zErrors"
 )
 
 const Batch = 10
@@ -155,12 +156,14 @@ func Migrate() error {
 
 	makeMigrationStatuses()
 
+	var batchStorageSize int64
 	for obj := range objCh {
 		zlogger.Logger.Info("Migrating ", obj.Key)
 		status := migrationStatuses[count]
 		status.objectKey = obj.Key
 		status.successCh = make(chan struct{}, 1)
 		status.errCh = make(chan error, 1)
+		batchStorageSize += obj.Size
 		wg.Add(1)
 
 		go migrateObject(&wg, obj, status, rootContext)
@@ -169,7 +172,15 @@ func Migrate() error {
 
 		if count == 10 {
 			batchCount++
-
+			migration.zStore.UpdateAllocationDetails()
+			availableStorage := migration.zStore.GetAvailableSpace()
+			if availableStorage < batchStorageSize {
+				zlogger.Logger.Info(fmt.Sprintf("Insufficient Space available space: %v, batchStorageSpace: %v", availableStorage, batchStorageSize))
+				abandonAllOperations(zerror.ErrInsufficientSpace)
+				count = 0
+				break
+			}
+			batchStorageSize = 0
 			wg.Wait()
 
 			stateKey, unresolvedError := checkStatuses(migrationStatuses)
