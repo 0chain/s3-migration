@@ -210,7 +210,7 @@ func GetDStorageService(allocationID, migrateTo, duplicateSuffix, workDir string
 		"encrypt: %v,"+
 		"migrateTo: %v,"+
 		"duplicateSuffix: %v, "+
-		"workDir: %v, ", allocationID, encrypt, migrateTo, duplicateSuffix, workDir))
+		"workDir: %v", allocationID, encrypt, migrateTo, duplicateSuffix, workDir))
 
 	return &DStorageService{
 		allocation:      allocation,
