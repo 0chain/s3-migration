@@ -315,6 +315,7 @@ func migrateObject(wg *sync.WaitGroup, objMeta *s3.ObjectMeta, status *migrating
 	if isFileExist {
 		switch migration.skip {
 		case Replace:
+			zlogger.Logger.Info("Replacing object" + objMeta.Key + " size " + strconv.FormatInt(objMeta.Size, 10))
 			err = migration.zStore.Replace(ctx, remotePath, obj.Body, objMeta.Size, obj.ContentType)
 		case Duplicate:
 			zlogger.Logger.Info("Duplicating object" + objMeta.Key + " size " + strconv.FormatInt(objMeta.Size, 10))
