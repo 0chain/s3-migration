@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"syscall"
+	"time"
 
 	dStorage "github.com/0chain/s3migration/dstorage"
 	zlogger "github.com/0chain/s3migration/logger"
@@ -182,8 +184,8 @@ func Migrate() error {
 			//log statekey
 			updateState(stateKey)
 			count = 0
+			time.Sleep(100 * time.Millisecond)
 		}
-
 	}
 
 	if count != 0 { //last batch that is not multiple of 10
@@ -315,10 +317,11 @@ func migrateObject(wg *sync.WaitGroup, objMeta *s3.ObjectMeta, status *migrating
 		case Replace:
 			err = migration.zStore.Replace(ctx, remotePath, obj.Body, objMeta.Size, obj.ContentType)
 		case Duplicate:
-			fmt.Println("Duplicating")
+			zlogger.Logger.Info("Duplicating object" + objMeta.Key + " size " + strconv.FormatInt(objMeta.Size, 10))
 			err = migration.zStore.Duplicate(ctx, remotePath, obj.Body, objMeta.Size, obj.ContentType)
 		}
 	} else {
+		zlogger.Logger.Info("Uploading object" + objMeta.Key + " size " + strconv.FormatInt(objMeta.Size, 10))
 		err = migration.zStore.Upload(ctx, remotePath, obj.Body, objMeta.Size, obj.ContentType, false)
 	}
 
