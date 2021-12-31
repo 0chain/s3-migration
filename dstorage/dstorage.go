@@ -178,6 +178,9 @@ func (d *DStorageService) IsFileExist(ctx context.Context, remotePath string) (b
 
 func (d *DStorageService) UpdateAllocationDetails() error {
 	err := sdk.GetAllocationUpdates(d.allocation)
+	if err != nil {
+		zlogger.Logger.Error("Error while updating allocation details, err: " + err.Error())
+	}
 	return err
 }
 
