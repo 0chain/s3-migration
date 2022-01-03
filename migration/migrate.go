@@ -128,6 +128,46 @@ type migratingObjStatus struct {
 	errCh     chan error //should be of type zerror
 }
 
+func processMigrationBatch(objList []*s3.ObjectMeta, migrationStatuses []*migratingObjStatus, count int) (stateKey string, batchProcessSuccess bool) {
+	migration.zStore.UpdateAllocationDetails()
+	availableStorage := migration.zStore.GetAvailableSpace()
+
+	var batchStorageSize int64
+	for i := 0; i < count; i++ {
+		obj := objList[i]
+		batchStorageSize += obj.Size
+	}
+
+	if availableStorage < batchStorageSize {
+		zlogger.Logger.Info(fmt.Sprintf("Insufficient Space available space: %v, batchStorageSpace: %v", availableStorage, batchStorageSize))
+		abandonAllOperations(zerror.ErrInsufficientSpace)
+		return
+	}
+
+	wg := sync.WaitGroup{}
+	for i := 0; i < count; i++ {
+		obj := objList[i]
+		zlogger.Logger.Info("Migrating ", obj.Key)
+		wg.Add(1)
+		status := migrationStatuses[i]
+		status.objectKey = obj.Key
+		status.successCh = make(chan struct{}, 1)
+		status.errCh = make(chan error, 1)
+		go migrateObject(&wg, obj, status, rootContext)
+	}
+	wg.Wait()
+
+	stateKey, unresolvedError := checkStatuses(migrationStatuses[:count])
+
+	if unresolvedError != nil {
+		//break migration
+		abandonAllOperations(unresolvedError)
+		return
+	}
+	batchProcessSuccess = true
+	return
+}
+
 func Migrate() error {
 	defer rootContextCancel()
 
@@ -145,9 +185,8 @@ func Migrate() error {
 
 	count := 0
 	batchCount := 0
-	wg := sync.WaitGroup{}
-
 	migrationStatuses := make([]*migratingObjStatus, 10)
+	objectMetaList := make([]*s3.ObjectMeta, 10)
 	makeMigrationStatuses := func() {
 		for i := 0; i < 10; i++ {
 			migrationStatuses[i] = new(migratingObjStatus)
@@ -155,59 +194,31 @@ func Migrate() error {
 	}
 
 	makeMigrationStatuses()
-
 	var batchStorageSize int64
 	for obj := range objCh {
-		zlogger.Logger.Info("Migrating ", obj.Key)
-		status := migrationStatuses[count]
-		status.objectKey = obj.Key
-		status.successCh = make(chan struct{}, 1)
-		status.errCh = make(chan error, 1)
+		objectMetaList[count] = obj
 		batchStorageSize += obj.Size
-		wg.Add(1)
-
-		go migrateObject(&wg, obj, status, rootContext)
-
 		count++
-
 		if count == 10 {
 			batchCount++
-			migration.zStore.UpdateAllocationDetails()
-			availableStorage := migration.zStore.GetAvailableSpace()
-			if availableStorage < batchStorageSize {
-				zlogger.Logger.Info(fmt.Sprintf("Insufficient Space available space: %v, batchStorageSpace: %v", availableStorage, batchStorageSize))
-				abandonAllOperations(zerror.ErrInsufficientSpace)
+			stateKey, batchProcessSuccess := processMigrationBatch(objectMetaList, migrationStatuses, count)
+			if !batchProcessSuccess {
 				count = 0
 				break
 			}
-			batchStorageSize = 0
-			wg.Wait()
-
-			stateKey, unresolvedError := checkStatuses(migrationStatuses)
-
-			if unresolvedError != nil {
-				//break migration
-				abandonAllOperations(unresolvedError)
-				count = 0
-				break
-			}
-
+			count = 0
 			//log statekey
 			updateState(stateKey)
-			count = 0
 			time.Sleep(100 * time.Millisecond)
 		}
 	}
 
 	if count != 0 { //last batch that is not multiple of 10
 		batchCount++
-		wg.Wait()
-		stateKey, unresolvedError := checkStatuses(migrationStatuses[:count])
-		if unresolvedError != nil {
-			zlogger.Logger.Error("Check for unresolved errors")
+		stateKey, batchProcessSuccess := processMigrationBatch(objectMetaList, migrationStatuses, count)
+		if batchProcessSuccess {
+			updateState(stateKey)
 		}
-
-		updateState(stateKey)
 
 	}
 
