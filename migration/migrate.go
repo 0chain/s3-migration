@@ -194,10 +194,8 @@ func Migrate() error {
 	}
 
 	makeMigrationStatuses()
-	var batchStorageSize int64
 	for obj := range objCh {
 		objectMetaList[count] = obj
-		batchStorageSize += obj.Size
 		count++
 		if count == 10 {
 			batchCount++
