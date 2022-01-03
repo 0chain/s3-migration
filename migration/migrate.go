@@ -186,7 +186,7 @@ func Migrate() error {
 	count := 0
 	batchCount := 0
 	migrationStatuses := make([]*migratingObjStatus, 10)
-	objectMetaList := make([]*s3.ObjectMeta, 10)
+	objectList := make([]*s3.ObjectMeta, 10)
 	makeMigrationStatuses := func() {
 		for i := 0; i < 10; i++ {
 			migrationStatuses[i] = new(migratingObjStatus)
@@ -195,11 +195,11 @@ func Migrate() error {
 
 	makeMigrationStatuses()
 	for obj := range objCh {
-		objectMetaList[count] = obj
+		objectList[count] = obj
 		count++
 		if count == 10 {
 			batchCount++
-			stateKey, batchProcessSuccess := processMigrationBatch(objectMetaList, migrationStatuses, count)
+			stateKey, batchProcessSuccess := processMigrationBatch(objectList, migrationStatuses, count)
 			if !batchProcessSuccess {
 				count = 0
 				break
@@ -213,7 +213,7 @@ func Migrate() error {
 
 	if count != 0 { //last batch that is not multiple of 10
 		batchCount++
-		stateKey, batchProcessSuccess := processMigrationBatch(objectMetaList, migrationStatuses, count)
+		stateKey, batchProcessSuccess := processMigrationBatch(objectList, migrationStatuses, count)
 		if batchProcessSuccess {
 			updateState(stateKey)
 		}
