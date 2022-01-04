@@ -2,7 +2,6 @@ package migration
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/0chain/errors"
 	dStorage "github.com/0chain/s3migration/dstorage"
 	zlogger "github.com/0chain/s3migration/logger"
 	"github.com/0chain/s3migration/s3"
@@ -114,7 +114,7 @@ func InitMigration(mConfig *MigrationConfig) error {
 	go func() {
 		sig := <-trapCh
 		zlogger.Logger.Info(fmt.Sprintf("Signal %v received", sig))
-		abandonAllOperations(errors.New("operation cancelled by user"))
+		abandonAllOperations(zerror.ErrOperationCancelledByUser)
 	}()
 
 	isMigrationInitialized = true
@@ -128,24 +128,23 @@ type migratingObjStatus struct {
 	errCh     chan error //should be of type zerror
 }
 
-func processMigrationBatch(objList []*s3.ObjectMeta, migrationStatuses []*migratingObjStatus, count int) (stateKey string, batchProcessSuccess bool) {
-	migration.zStore.UpdateAllocationDetails()
-	availableStorage := migration.zStore.GetAvailableSpace()
-
-	var batchStorageSize int64
-	for i := 0; i < count; i++ {
-		obj := objList[i]
-		batchStorageSize += obj.Size
+func processMigrationBatch(objList []*s3.ObjectMeta, migrationStatuses []*migratingObjStatus, batchSize int64) (stateKey string, batchProcessSuccess bool) {
+	if err := migration.zStore.UpdateAllocationDetails(); err != nil {
+		zlogger.Logger.Error("Error while updating allocation details; ", err)
+		abandonAllOperations(err)
+		return
 	}
 
-	if availableStorage < batchStorageSize {
-		zlogger.Logger.Info(fmt.Sprintf("Insufficient Space available space: %v, batchStorageSpace: %v", availableStorage, batchStorageSize))
-		abandonAllOperations(zerror.ErrInsufficientSpace)
+	availableStorage := migration.zStore.GetAvailableSpace()
+
+	if availableStorage < batchSize {
+		zlogger.Logger.Error(fmt.Sprintf("Insufficient Space available space: %v, batchStorageSpace: %v", availableStorage, batchSize))
+		abandonAllOperations(errors.New(zerror.InsufficientZStorageSpace, fmt.Sprintf("Available: %v, Batch Size: %v", availableStorage, batchSize)))
 		return
 	}
 
 	wg := sync.WaitGroup{}
-	for i := 0; i < count; i++ {
+	for i := 0; i < len(objList); i++ {
 		obj := objList[i]
 		zlogger.Logger.Info("Migrating ", obj.Key)
 		wg.Add(1)
@@ -157,7 +156,7 @@ func processMigrationBatch(objList []*s3.ObjectMeta, migrationStatuses []*migrat
 	}
 	wg.Wait()
 
-	stateKey, unresolvedError := checkStatuses(migrationStatuses[:count])
+	stateKey, unresolvedError := checkStatuses(migrationStatuses[:len(objList)])
 
 	if unresolvedError != nil {
 		//break migration
@@ -183,29 +182,34 @@ func Migrate() error {
 
 	objCh, errCh := migration.awsStore.ListFilesInBucket(rootContext)
 
-	count := 0
-	batchCount := 0
-	migrationStatuses := make([]*migratingObjStatus, 10)
+	var count, batchCount int
+
 	objectList := make([]*s3.ObjectMeta, 10)
+	migrationStatuses := make([]*migratingObjStatus, 10)
 	makeMigrationStatuses := func() {
 		for i := 0; i < 10; i++ {
 			migrationStatuses[i] = new(migratingObjStatus)
 		}
 	}
-
 	makeMigrationStatuses()
+
+	var batchSize int64
 	for obj := range objCh {
 		objectList[count] = obj
 		count++
+		batchSize += obj.Size
 		if count == 10 {
 			batchCount++
-			stateKey, batchProcessSuccess := processMigrationBatch(objectList, migrationStatuses, count)
+			stateKey, batchProcessSuccess := processMigrationBatch(objectList, migrationStatuses, batchSize)
 			if !batchProcessSuccess {
 				count = 0
 				break
 			}
+
 			count = 0
-			//log statekey
+			batchSize = 0
+
+			zlogger.Logger.Info("New State Key: ", stateKey)
 			updateState(stateKey)
 			time.Sleep(100 * time.Millisecond)
 		}
@@ -213,7 +217,7 @@ func Migrate() error {
 
 	if count != 0 { //last batch that is not multiple of 10
 		batchCount++
-		stateKey, batchProcessSuccess := processMigrationBatch(objectList, migrationStatuses, count)
+		stateKey, batchProcessSuccess := processMigrationBatch(objectList[:count], migrationStatuses, batchSize)
 		if batchProcessSuccess {
 			updateState(stateKey)
 		}
