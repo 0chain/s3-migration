@@ -31,6 +31,7 @@ import (
 //We also need to be careful about committing upload. There might be race between committing request resulting in commit failure.
 //So lets put commit request in a queue(use channel) and try three times. If it fails to commit then save state of all bucket and abort the program.
 
+//go:generate mockgen -destination mocks/mock_dstorage.go -package mock_dstorage github.com/0chain/s3migration/dstorage DStoreI
 type DStoreI interface {
 	GetFileMetaData(ctx context.Context, remotePath string) (*sdk.ORef, error)
 	Replace(ctx context.Context, remotePath string, r io.Reader, size int64, contentType string) error

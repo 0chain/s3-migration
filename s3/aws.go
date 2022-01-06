@@ -14,6 +14,7 @@ import (
 	awsS3 "github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
+//go:generate mockgen -destination mocks/mock_aws.go -package mock_s3 github.com/0chain/s3migration/s3 AwsI
 type AwsI interface {
 	ListFilesInBucket(ctx context.Context) (<-chan *ObjectMeta, <-chan error)
 	GetFileContent(ctx context.Context, objectKey string) (*Object, error)
