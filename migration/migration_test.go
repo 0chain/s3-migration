@@ -22,12 +22,6 @@ func TestMigrate(t *testing.T) {
 		zStore:   dStorageService,
 		awsStore: awsStorageService,
 		skip:     Skip,
-		//concurrency:   mConfig.Concurrency,
-		//retryCount:    mConfig.RetryCount,
-		//stateFilePath: mConfig.StateFilePath,
-		//migrateTo:     mConfig.MigrateToPath,
-		//deleteSource:  mConfig.DeleteSource,
-		//workDir:       mConfig.WorkDir,
 	}
 
 	isMigrationInitialized = true
@@ -188,6 +182,26 @@ func TestMigrate(t *testing.T) {
 			},
 			wantErr: true,
 			err:     context.Canceled,
+		},
+		{
+			name: "aws list object error",
+			setUpMock: func() {
+				rootContext, rootContextCancel = context.WithCancel(context.Background())
+				fileListChan := make(chan *s3.ObjectMeta, 1000)
+
+				close(fileListChan)
+
+				errChan := make(chan error, 1)
+				errChan <- errors.New("some error")
+
+				awsStorageService.EXPECT().ListFilesInBucket(gomock.Any()).Return(fileListChan, errChan)
+
+				updateStateKeyFunc = func(statePath string) (func(stateKey string), func(), error) {
+					return func(stateKey string) {}, func() {}, nil
+				}
+			},
+			wantErr: true,
+			err:     errors.New("some error"),
 		},
 	}
 
