@@ -75,6 +75,7 @@ func initConfig() {
 	zcncore.SetLogFile("cmdlog.log", !bSilent)
 	sdk.SetLogFile("cmdlog.log", !bSilent)
 	zlogger.SetLogFile("s3migration.log", !bSilent)
+	zlogger.SetLatencyLogFile("s3migration_latency.log", !bSilent)
 
 	if network.IsValid() {
 		zcncore.SetNetwork(network.Miners, network.Sharders)

@@ -139,6 +139,9 @@ func (a *AwsClient) getBucketRegion() (region string, err error) {
 }
 
 func (a *AwsClient) ListFilesInBucket(ctx context.Context) (<-chan *ObjectMeta, <-chan error) {
+	defer func(startTime time.Time) {
+		zlogger.LogTimeTaken("aws.ListFilesInBucket", "", time.Now().Sub(startTime).Seconds())
+	}(time.Now())
 	objectMetaChan := make(chan *ObjectMeta, 1000)
 	errChan := make(chan error, 1)
 
@@ -194,6 +197,9 @@ func (a *AwsClient) ListFilesInBucket(ctx context.Context) (<-chan *ObjectMeta, 
 }
 
 func (a *AwsClient) GetFileContent(ctx context.Context, objectKey string) (*Object, error) {
+	defer func(startTime time.Time) {
+		zlogger.LogTimeTaken("aws.GetFileContent", objectKey, time.Now().Sub(startTime).Seconds())
+	}(time.Now())
 	out, err := a.client.GetObject(ctx, &awsS3.GetObjectInput{Bucket: aws.String(a.bucket), Key: aws.String(objectKey)})
 	if err != nil {
 		return nil, err

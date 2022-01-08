@@ -129,6 +129,9 @@ type migratingObjStatus struct {
 }
 
 func processMigrationBatch(objList []*s3.ObjectMeta, migrationStatuses []*migratingObjStatus, batchSize int64) (stateKey string, batchProcessSuccess bool) {
+	defer func(startTime time.Time) {
+		zlogger.LogTimeTaken("processMigrationBatch", "", time.Now().Sub(startTime).Seconds())
+	}(time.Now())
 	if err := migration.zStore.UpdateAllocationDetails(); err != nil {
 		zlogger.Logger.Error("Error while updating allocation details; ", err)
 		abandonAllOperations(err)
@@ -152,7 +155,22 @@ func processMigrationBatch(objList []*s3.ObjectMeta, migrationStatuses []*migrat
 		status.objectKey = obj.Key
 		status.successCh = make(chan struct{}, 1)
 		status.errCh = make(chan error, 1)
-		go migrateObject(&wg, obj, status, rootContext)
+		go func() {
+			defer wg.Done()
+			err := util.Retry(3, time.Second*5, func() error {
+				err := migrateObject(obj, rootContext)
+				return err
+			})
+			if err != nil {
+				status.errCh <- err
+			} else {
+				status.successCh <- struct{}{}
+				migration.szCtMu.Lock()
+				migration.migratedSize += uint64(obj.Size)
+				migration.totalMigratedObjects++
+				migration.szCtMu.Unlock()
+			}
+		}()
 	}
 	wg.Wait()
 
@@ -168,6 +186,9 @@ func processMigrationBatch(objList []*s3.ObjectMeta, migrationStatuses []*migrat
 }
 
 func Migrate() error {
+	defer func(startTime time.Time) {
+		zlogger.LogTimeTaken("Migrate", "", time.Now().Sub(startTime).Seconds())
+	}(time.Now())
 	defer rootContextCancel()
 
 	if !isMigrationInitialized {
@@ -192,16 +213,16 @@ func Migrate() error {
 		}
 	}
 	makeMigrationStatuses()
-
+	batchConcurrency := 10
 	var batchSize int64
 	var migrationSuccess bool
 	for obj := range objCh {
 		objectList[count] = obj
 		count++
 		batchSize += obj.Size
-		if count == 10 {
+		if count == batchConcurrency {
 			batchCount++
-			stateKey, batchProcessSuccess := processMigrationBatch(objectList, migrationStatuses, batchSize)
+			stateKey, batchProcessSuccess := processMigrationBatch(objectList[:count], migrationStatuses, batchSize)
 			migrationSuccess = batchProcessSuccess
 			if !batchProcessSuccess {
 				count = 0
@@ -318,8 +339,10 @@ var updateStateKeyFunc = func(statePath string) (func(stateKey string), func(), 
 	return stateKeyUpdater, fileCloser, nil
 }
 
-func migrateObject(wg *sync.WaitGroup, objMeta *s3.ObjectMeta, status *migratingObjStatus, ctx context.Context) {
-	defer wg.Done()
+func migrateObject(objMeta *s3.ObjectMeta, ctx context.Context) error {
+	defer func(startTime time.Time) {
+		zlogger.LogTimeTaken("migrateObject", objMeta.Key, time.Now().Sub(startTime).Seconds())
+	}(time.Now())
 
 	remotePath := filepath.Join(migration.migrateTo, objMeta.Key)
 
@@ -327,21 +350,18 @@ func migrateObject(wg *sync.WaitGroup, objMeta *s3.ObjectMeta, status *migrating
 
 	if err != nil {
 		zlogger.Logger.Error(err)
-		status.errCh <- err
-		return
+		return err
 	}
 
 	if isFileExist && migration.skip == Skip {
 		zlogger.Logger.Info("Skipping migration of object" + objMeta.Key)
-		status.successCh <- struct{}{}
-		return
+		return nil
 	}
 
 	obj, err := migration.awsStore.GetFileContent(ctx, objMeta.Key)
 	if err != nil {
 		zlogger.Logger.Error(err)
-		status.errCh <- err
-		return
+		return err
 	}
 
 	if isFileExist {
@@ -360,16 +380,11 @@ func migrateObject(wg *sync.WaitGroup, objMeta *s3.ObjectMeta, status *migrating
 
 	if err != nil {
 		zlogger.Logger.Error(err)
-		status.errCh <- err
+		return err
 	} else {
-		status.successCh <- struct{}{}
-		migration.szCtMu.Lock()
-		migration.migratedSize += uint64(objMeta.Size)
-		migration.totalMigratedObjects++
-		migration.szCtMu.Unlock()
-
 		if migration.deleteSource {
 			migration.awsStore.DeleteFile(ctx, objMeta.Key)
 		}
+		return nil
 	}
 }

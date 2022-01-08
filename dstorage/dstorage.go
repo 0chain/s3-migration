@@ -95,8 +95,8 @@ func (d *DStorageService) GetFileMetaData(ctx context.Context, remotePath string
 func getChunkSize(size int64) int64 {
 	var chunkSize int64
 	switch {
-	case size > HundredMB:
-		chunkSize = 2 * TenMB
+	//case size > HundredMB:
+	//	chunkSize = 2 * TenMB
 	case size > TenMB:
 		chunkSize = TenMB
 	case size > OneMB:
@@ -110,6 +110,9 @@ func getChunkSize(size int64) int64 {
 }
 
 func (d *DStorageService) Upload(ctx context.Context, remotePath string, r io.Reader, size int64, contentType string, isUpdate bool) (err error) {
+	defer func(startTime time.Time) {
+		zlogger.LogTimeTaken("dstorage.Upload", remotePath, time.Now().Sub(startTime).Seconds())
+	}(time.Now())
 	cb := &statusCB{
 		doneCh: make(chan struct{}, 1),
 		errCh:  make(chan error, 1),
@@ -167,6 +170,9 @@ func (d *DStorageService) Duplicate(ctx context.Context, remotePath string, r io
 }
 
 func (d *DStorageService) IsFileExist(ctx context.Context, remotePath string) (bool, error) {
+	defer func(startTime time.Time) {
+		zlogger.LogTimeTaken("dstorage.IsFileExist", remotePath, time.Now().Sub(startTime).Seconds())
+	}(time.Now())
 	_, err := d.GetFileMetaData(ctx, remotePath)
 	if err != nil {
 		if zerror.IsFileNotExistError(err) {
@@ -178,6 +184,9 @@ func (d *DStorageService) IsFileExist(ctx context.Context, remotePath string) (b
 }
 
 func (d *DStorageService) UpdateAllocationDetails() error {
+	defer func(startTime time.Time) {
+		zlogger.LogTimeTaken("dstorage.UpdateAllocationDetails", "", time.Now().Sub(startTime).Seconds())
+	}(time.Now())
 	return sdk.GetAllocationUpdates(d.allocation)
 }
 

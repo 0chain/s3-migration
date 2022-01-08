@@ -26,7 +26,6 @@ func (cb *statusCB) Completed(allocationID, filePath string, filename string, mi
 }
 
 func (cb *statusCB) CommitMetaCompleted(request, response string, txn *transaction.Transaction, err error) {
-	cb.doneCh <- struct{}{}
 }
 
 func (cb *statusCB) RepairCompleted(filesRepaired int) {
