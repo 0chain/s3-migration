@@ -135,7 +135,7 @@ func TestMigrate(t *testing.T) {
 				dStorageService.EXPECT().IsFileExist(gomock.Any(), gomock.Any()).AnyTimes().Return(false, nil)
 				awsStorageService.EXPECT().GetFileContent(gomock.Any(), "file11").AnyTimes().Return(&s3.Object{}, nil)
 				awsStorageService.EXPECT().GetFileContent(gomock.Any(), "file33").AnyTimes().Return(&s3.Object{}, nil)
-				awsStorageService.EXPECT().GetFileContent(gomock.Any(), "file22").Return(&s3.Object{}, errors.New("some error"))
+				awsStorageService.EXPECT().GetFileContent(gomock.Any(), "file22").AnyTimes().Return(&s3.Object{}, errors.New("some error"))
 				dStorageService.EXPECT().Upload(gomock.Any(), "file11", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
 				dStorageService.EXPECT().Upload(gomock.Any(), "file22", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
 				dStorageService.EXPECT().Upload(gomock.Any(), "file33", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
@@ -174,10 +174,10 @@ func TestMigrate(t *testing.T) {
 				dStorageService.EXPECT().GetAvailableSpace().Return(int64(4200))
 				dStorageService.EXPECT().IsFileExist(gomock.Any(), gomock.Any()).AnyTimes().Return(false, nil)
 				awsStorageService.EXPECT().GetFileContent(gomock.Any(), "file10").Return(&s3.Object{}, nil)
-				awsStorageService.EXPECT().GetFileContent(gomock.Any(), "file20").Return(&s3.Object{}, nil)
+				awsStorageService.EXPECT().GetFileContent(gomock.Any(), "file20").AnyTimes().Return(&s3.Object{}, nil)
 				awsStorageService.EXPECT().GetFileContent(gomock.Any(), "file30").Return(&s3.Object{}, nil)
 				dStorageService.EXPECT().Upload(gomock.Any(), "file10", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
-				dStorageService.EXPECT().Upload(gomock.Any(), "file20", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.New("some error"))
+				dStorageService.EXPECT().Upload(gomock.Any(), "file20", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(errors.New("some error"))
 				dStorageService.EXPECT().Upload(gomock.Any(), "file30", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 			},
 			wantErr: true,

@@ -195,15 +195,15 @@ func Migrate() error {
 
 	var batchSize int64
 	var migrationSuccess bool
+	var stateKey string
 	for obj := range objCh {
 		objectList[count] = obj
 		count++
 		batchSize += obj.Size
 		if count == 10 {
 			batchCount++
-			stateKey, batchProcessSuccess := processMigrationBatch(objectList, migrationStatuses, batchSize)
-			migrationSuccess = batchProcessSuccess
-			if !batchProcessSuccess {
+			stateKey, migrationSuccess = processMigrationBatch(objectList, migrationStatuses, batchSize)
+			if !migrationSuccess {
 				count = 0
 				break
 			}
@@ -219,9 +219,8 @@ func Migrate() error {
 
 	if count != 0 { //last batch that is not multiple of 10
 		batchCount++
-		stateKey, batchProcessSuccess := processMigrationBatch(objectList[:count], migrationStatuses, batchSize)
-		migrationSuccess = batchProcessSuccess
-		if batchProcessSuccess {
+		stateKey, migrationSuccess = processMigrationBatch(objectList[:count], migrationStatuses, batchSize)
+		if migrationSuccess {
 			updateState(stateKey)
 		}
 
