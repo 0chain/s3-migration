@@ -129,9 +129,6 @@ type migratingObjStatus struct {
 }
 
 func processMigrationBatch(objList []*s3.ObjectMeta, migrationStatuses []*migratingObjStatus, batchSize int64) (stateKey string, batchProcessSuccess bool) {
-	defer func(startTime time.Time) {
-		zlogger.LogTimeTaken("processMigrationBatch", "", time.Now().Sub(startTime).Seconds())
-	}(time.Now())
 	if err := migration.zStore.UpdateAllocationDetails(); err != nil {
 		zlogger.Logger.Error("Error while updating allocation details; ", err)
 		abandonAllOperations(err)
@@ -186,9 +183,6 @@ func processMigrationBatch(objList []*s3.ObjectMeta, migrationStatuses []*migrat
 }
 
 func Migrate() error {
-	defer func(startTime time.Time) {
-		zlogger.LogTimeTaken("Migrate", "", time.Now().Sub(startTime).Seconds())
-	}(time.Now())
 	defer rootContextCancel()
 
 	if !isMigrationInitialized {
@@ -339,10 +333,6 @@ var updateStateKeyFunc = func(statePath string) (func(stateKey string), func(), 
 }
 
 func migrateObject(objMeta *s3.ObjectMeta, ctx context.Context) error {
-	defer func(startTime time.Time) {
-		zlogger.LogTimeTaken("migrateObject", objMeta.Key, time.Now().Sub(startTime).Seconds())
-	}(time.Now())
-
 	remotePath := filepath.Join(migration.migrateTo, objMeta.Key)
 
 	isFileExist, err := migration.zStore.IsFileExist(ctx, remotePath)
