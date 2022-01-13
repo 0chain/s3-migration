@@ -8,7 +8,6 @@ import (
 
 var defaultLogLevel = logger.DEBUG
 var Logger logger.Logger
-var LatencyLogger logger.Logger
 
 func init() {
 	Logger.Init(defaultLogLevel, "s3-migration")
