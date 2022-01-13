@@ -223,7 +223,7 @@ func Migrate() error {
 		batchSize += obj.Size
 		if count == batchConcurrency {
 			batchCount++
-			stateKey, migrationSuccess = processMigrationBatch(objectListobjectList[:count], migrationStatuses, batchSize)
+			stateKey, migrationSuccess = processMigrationBatch(objectList[:count], migrationStatuses, batchSize)
 			if !migrationSuccess {
 				count = 0
 				break
