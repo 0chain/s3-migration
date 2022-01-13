@@ -10,6 +10,10 @@ When you run the `s3mgrt` command in terminal with no arguments, it will list al
 [help](#help)|Help about any command
 [migrate](#migrate)|Migrate user data from S3 bucket to dStorage
 
+## Running Test cases
+
+`go run ./...`
+
 ### Global Flags
 
 Global Flags are parameters in s3mgrt that can be used with any command to override the default configuration supports the following global parameters.
@@ -54,6 +58,13 @@ occurred in previous migration session. User can also specify whether to delete 
 | resume |  | pass this option to resume migration from previous state               | false | boolean    |
 | skip |  | 0 --> Replace existing files; 1 --> Skip migration; 2 --> Duplicate               | 1 | string    |
 | wd |  | Working directory               | $HOME/.s3migration | string    |
+
+## BenchMark
+
+**Data Shard**|**Parity**|**Upload Size**|**File count**|**Time Taken**|**Network Speed**
+:----------:|:---------:|:-----:|:-----:|:------:|:------:
+4|2|20 gb|199|1 hr 25min|15 MBps
+
 
 
 
