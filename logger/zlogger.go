@@ -1,8 +1,9 @@
 package zlogger
 
 import (
-	"github.com/0chain/gosdk/core/logger"
 	"os"
+
+	"github.com/0chain/gosdk/core/logger"
 )
 
 var defaultLogLevel = logger.DEBUG
@@ -11,7 +12,6 @@ var LatencyLogger logger.Logger
 
 func init() {
 	Logger.Init(defaultLogLevel, "s3-migration")
-	LatencyLogger.Init(defaultLogLevel, "s3-migration-latency")
 }
 
 func SetLogFile(logFile string, verbose bool) {

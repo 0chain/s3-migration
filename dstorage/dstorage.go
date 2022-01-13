@@ -95,8 +95,6 @@ func (d *DStorageService) GetFileMetaData(ctx context.Context, remotePath string
 func getChunkSize(size int64) int64 {
 	var chunkSize int64
 	switch {
-	//case size > HundredMB:
-	//	chunkSize = 2 * TenMB
 	case size > TenMB:
 		chunkSize = TenMB
 	case size > OneMB:
