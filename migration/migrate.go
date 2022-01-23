@@ -61,6 +61,7 @@ type Migration struct {
 	migrateTo     string
 	workDir       string
 	deleteSource  bool
+	bucket        string
 }
 
 func InitMigration(mConfig *MigrationConfig) error {
@@ -105,6 +106,7 @@ func InitMigration(mConfig *MigrationConfig) error {
 		migrateTo:     mConfig.MigrateToPath,
 		deleteSource:  mConfig.DeleteSource,
 		workDir:       mConfig.WorkDir,
+		bucket:        mConfig.Bucket,
 	}
 
 	rootContext, rootContextCancel = context.WithCancel(context.Background())

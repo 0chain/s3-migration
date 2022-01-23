@@ -63,6 +63,9 @@ const (
 	TenMB            = 10 * OneMB
 	HundredMB        = 10 * TenMB
 
+	MaxChunkSize = 2 * TenMB
+	MinChunkSize = DefaultChunkSize
+
 	GetRefRetryWaitTime = 500 * time.Millisecond
 	GetRefRetryCount    = 2
 )
@@ -85,11 +88,28 @@ func (d *DStorageService) GetFileMetaData(ctx context.Context, remotePath string
 		}
 	}
 
-	if len(oResult.Refs) == 0 {
+	if oResult == nil || len(oResult.Refs) == 0 {
 		return nil, zerror.ErrFileNoExist
 	}
 
 	return &oResult.Refs[0], nil
+}
+
+func getChunkSizeNew(size int64, dataShards int) (chunkSize int64) {
+
+	var chunkNum int64 = 1
+	for {
+		chunkSize = (size + int64(dataShards)*chunkNum - 1) / (int64(dataShards) * chunkNum) //equivalent to math.ceil
+		if chunkSize <= MaxChunkSize {
+			break
+		}
+		chunkNum++
+	}
+
+	if chunkSize < MinChunkSize {
+		chunkSize = MinChunkSize
+	}
+	return
 }
 
 func getChunkSize(size int64) int64 {
