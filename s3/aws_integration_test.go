@@ -84,3 +84,16 @@ func TestService_DeleteFile(t *testing.T) {
 		log.Printf("object key deletion error,err = %+v", err)
 	}
 }
+
+func TestAwsClient_DownloadManager(t *testing.T) {
+	awsAccessKey := "AKIA4MPQDEZ4FKNA3OPR"
+	awsSecretKey := "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"
+
+	util.SetAwsEnvCredentials(awsAccessKey, awsSecretKey)
+	objectKey := "filesforbucket/65.txt"
+	x := time.Now()
+	s3Svc, _ := GetAwsClient("lpobkt1", "", "", false, nil, nil, "", "/Users/mdmiranahmedansari/aws_temp")
+	downloadPath, err := s3Svc.DownloadToFile(context.Background(), objectKey)
+	log.Println(downloadPath, err)
+	log.Println(time.Now().Sub(x).Seconds())
+}

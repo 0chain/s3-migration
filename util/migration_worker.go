@@ -10,11 +10,11 @@ const (
 	downloadConcurrencyLimit = 30
 	fileSizeLimit            = int64(1024*1024) * int64(1024) * int64(5)
 	uploadConcurrencyLimit   = 10
-	uploadSizeLimit          = int64(1024*1024) * int64(500)
+	uploadSizeLimit          = int64(1024*1024) * int64(1024) * int64(2)
 	downloadSizeLimit        = int64(1024*1024) * int64(500)
 )
 
-type MigrationQueue struct {
+type MigrationWorker struct {
 	diskMutex             *sync.RWMutex
 	errMutex              *sync.RWMutex
 	currentFileSizeOnDisk int64
@@ -43,8 +43,8 @@ type UploadObjectMeta struct {
 	ErrChan   chan error
 }
 
-func NewMigrationQueue() *MigrationQueue {
-	return &MigrationQueue{
+func NewMigrationWorker() *MigrationWorker {
+	return &MigrationWorker{
 		diskMutex:     &sync.RWMutex{},
 		errMutex:      &sync.RWMutex{},
 		downloadQueue: make(chan *DownloadObjectMeta, 10000),
@@ -52,45 +52,45 @@ func NewMigrationQueue() *MigrationQueue {
 	}
 }
 
-func (m *MigrationQueue) updateFileSizeOnDisk(size int64) {
+func (m *MigrationWorker) updateFileSizeOnDisk(size int64) {
 	m.diskMutex.Lock()
 	m.currentFileSizeOnDisk += size
 	m.diskMutex.Unlock()
 }
 
-func (m *MigrationQueue) GetDownloadQueue() <-chan *DownloadObjectMeta {
+func (m *MigrationWorker) GetDownloadQueue() <-chan *DownloadObjectMeta {
 	return m.downloadQueue
 }
 
-func (m *MigrationQueue) GetUploadQueue() <-chan *UploadObjectMeta {
+func (m *MigrationWorker) GetUploadQueue() <-chan *UploadObjectMeta {
 	return m.uploadQueue
 }
 
-func (m *MigrationQueue) incrUploadConcurrency() {
+func (m *MigrationWorker) incrUploadConcurrency() {
 	atomic.AddInt32(&m.uploadConcurrency, 1)
 }
 
-func (m *MigrationQueue) decrUploadConcurrency() {
+func (m *MigrationWorker) decrUploadConcurrency() {
 	atomic.AddInt32(&m.uploadConcurrency, -1)
 }
 
-func (m *MigrationQueue) checkUploadStatus() bool {
+func (m *MigrationWorker) checkUploadStatus() bool {
 	return atomic.LoadInt32(&m.uploadConcurrency) >= uploadConcurrencyLimit || atomic.LoadInt64(&m.currentUploadSize) >= uploadSizeLimit
 }
 
-func (m *MigrationQueue) PauseUpload() {
+func (m *MigrationWorker) PauseUpload() {
 	for m.checkUploadStatus() {
 		time.Sleep(5 * time.Second)
 	}
 }
 
-func (m *MigrationQueue) UploadStart(u *UploadObjectMeta) {
+func (m *MigrationWorker) UploadStart(u *UploadObjectMeta) {
 	m.incrUploadConcurrency()
 	atomic.AddInt64(&m.currentUploadSize, u.Size)
 	m.uploadQueue <- u
 }
 
-func (m *MigrationQueue) UploadDone(u *UploadObjectMeta, err error) {
+func (m *MigrationWorker) UploadDone(u *UploadObjectMeta, err error) {
 	m.updateFileSizeOnDisk(-u.Size)
 	m.decrUploadConcurrency()
 	atomic.AddInt64(&m.currentUploadSize, -u.Size)
@@ -100,19 +100,19 @@ func (m *MigrationQueue) UploadDone(u *UploadObjectMeta, err error) {
 	u.DoneChan <- struct{}{}
 }
 
-func (m *MigrationQueue) CloseUploadQueue() {
+func (m *MigrationWorker) CloseUploadQueue() {
 	close(m.uploadQueue)
 }
 
-func (m *MigrationQueue) incrDownloadConcurrency() {
+func (m *MigrationWorker) incrDownloadConcurrency() {
 	atomic.AddInt32(&m.downloadConcurrency, 1)
 }
 
-func (m *MigrationQueue) decrDownloadConcurrency() {
+func (m *MigrationWorker) decrDownloadConcurrency() {
 	atomic.AddInt32(&m.downloadConcurrency, -1)
 }
 
-func (m *MigrationQueue) checkDownloadStatus() bool {
+func (m *MigrationWorker) checkDownloadStatus() bool {
 	m.diskMutex.RLock()
 	defer m.diskMutex.RUnlock()
 	return m.currentFileSizeOnDisk >= fileSizeLimit ||
@@ -120,20 +120,20 @@ func (m *MigrationQueue) checkDownloadStatus() bool {
 		atomic.LoadInt64(&m.currentDownloadSize) >= downloadSizeLimit
 }
 
-func (m *MigrationQueue) PauseDownload() {
+func (m *MigrationWorker) PauseDownload() {
 	for m.checkDownloadStatus() {
 		time.Sleep(5 * time.Second)
 	}
 }
 
-func (m *MigrationQueue) DownloadStart(d *DownloadObjectMeta) {
+func (m *MigrationWorker) DownloadStart(d *DownloadObjectMeta) {
 	m.incrDownloadConcurrency()
 	m.downloadQueue <- d
 	m.updateFileSizeOnDisk(d.Size)
 	atomic.AddInt64(&m.currentDownloadSize, d.Size)
 }
 
-func (m *MigrationQueue) DownloadDone(d *DownloadObjectMeta, localPath string, err error) {
+func (m *MigrationWorker) DownloadDone(d *DownloadObjectMeta, localPath string, err error) {
 	m.decrDownloadConcurrency()
 	atomic.AddInt64(&m.currentDownloadSize, -d.Size)
 	if err != nil {
@@ -144,21 +144,21 @@ func (m *MigrationQueue) DownloadDone(d *DownloadObjectMeta, localPath string, e
 	}
 }
 
-func (m *MigrationQueue) CloseDownloadQueue() {
+func (m *MigrationWorker) CloseDownloadQueue() {
 	close(m.downloadQueue)
 }
 
-func (m *MigrationQueue) GetMigrationError() error {
+func (m *MigrationWorker) GetMigrationError() error {
 	m.errMutex.RLock()
 	defer m.errMutex.RUnlock()
 	return m.errInSystem
 }
 
-func (m *MigrationQueue) IsMigrationError() bool {
+func (m *MigrationWorker) IsMigrationError() bool {
 	return m.GetMigrationError() != nil
 }
 
-func (m *MigrationQueue) SetMigrationError(err error) {
+func (m *MigrationWorker) SetMigrationError(err error) {
 	if err != nil {
 		m.errMutex.Lock()
 		defer m.errMutex.Unlock()

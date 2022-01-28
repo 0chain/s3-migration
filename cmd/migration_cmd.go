@@ -206,7 +206,7 @@ var migrateCmd = &cobra.Command{
 			return err
 		}
 
-		return migration.MigrationStart()
+		return migration.StartMigration()
 	},
 }
 

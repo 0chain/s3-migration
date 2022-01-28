@@ -49,6 +49,21 @@ func (mr *MockAwsIMockRecorder) DeleteFile(arg0, arg1 interface{}) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteFile", reflect.TypeOf((*MockAwsI)(nil).DeleteFile), arg0, arg1)
 }
 
+// DownloadToFile mocks base method.
+func (m *MockAwsI) DownloadToFile(arg0 context.Context, arg1 string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DownloadToFile", arg0, arg1)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DownloadToFile indicates an expected call of DownloadToFile.
+func (mr *MockAwsIMockRecorder) DownloadToFile(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DownloadToFile", reflect.TypeOf((*MockAwsI)(nil).DownloadToFile), arg0, arg1)
+}
+
 // GetFileContent mocks base method.
 func (m *MockAwsI) GetFileContent(arg0 context.Context, arg1 string) (*s3.Object, error) {
 	m.ctrl.T.Helper()
