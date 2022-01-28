@@ -46,6 +46,7 @@ func abandonAllOperations(err error) {
 type Migration struct {
 	zStore   dStorage.DStoreI
 	awsStore s3.AwsI
+	fs       util.FileSystem
 
 	skip       int
 	retryCount int
@@ -107,6 +108,7 @@ func InitMigration(mConfig *MigrationConfig) error {
 		deleteSource:  mConfig.DeleteSource,
 		workDir:       mConfig.WorkDir,
 		bucket:        mConfig.Bucket,
+		fs:            util.Fs,
 	}
 
 	rootContext, rootContextCancel = context.WithCancel(context.Background())
@@ -251,7 +253,7 @@ func (m *Migration) UploadWorker(ctx context.Context, migrator *util.MigrationWo
 				migrator.SetMigrationError(err)
 				return
 			}
-			defer os.Remove(downloadObj.LocalPath)
+			defer m.fs.Remove(downloadObj.LocalPath)
 			migrator.UploadStart(uploadObj)
 			zlogger.Logger.Info("upload start", uploadObj.ObjectKey, uploadObj.Size)
 			err = util.Retry(3, time.Second*5, func() error {
@@ -304,7 +306,7 @@ func checkDownloadStatus(downloadObj *util.DownloadObjectMeta) error {
 func processUpload(ctx context.Context, downloadObj *util.DownloadObjectMeta) error {
 	remotePath := getRemotePath(downloadObj.ObjectKey)
 
-	fileObj, err := os.Open(downloadObj.LocalPath)
+	fileObj, err := migration.fs.Open(downloadObj.LocalPath)
 	if err != nil {
 		zlogger.Logger.Error(err)
 		return err

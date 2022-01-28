@@ -6,6 +6,7 @@ import (
 	mock_dstorage "github.com/0chain/s3migration/dstorage/mocks"
 	"github.com/0chain/s3migration/s3"
 	mock_s3 "github.com/0chain/s3migration/s3/mocks"
+	mock_util "github.com/0chain/s3migration/util/mocks"
 	"github.com/golang/mock/gomock"
 	"log"
 	"testing"
@@ -18,10 +19,12 @@ func TestMigrate(t *testing.T) {
 
 	dStorageService := mock_dstorage.NewMockDStoreI(ctrl)
 	awsStorageService := mock_s3.NewMockAwsI(ctrl)
+	fileSystem := mock_util.NewMockFileSystem(ctrl)
 	migration = Migration{
 		zStore:   dStorageService,
 		awsStore: awsStorageService,
 		skip:     Skip,
+		fs:       fileSystem,
 	}
 
 	isMigrationInitialized = true
@@ -32,38 +35,6 @@ func TestMigrate(t *testing.T) {
 		err              error
 		migrateFileCount int
 	}{
-		{
-			name: "insufficient allocation space",
-			setUpMock: func() {
-				rootContext, rootContextCancel = context.WithCancel(context.Background())
-				fileListChan := make(chan *s3.ObjectMeta, 1000)
-				fileListChan <- &s3.ObjectMeta{
-					Key: "file1", Size: 1200,
-				}
-
-				fileListChan <- &s3.ObjectMeta{
-					Key: "file2", Size: 1400,
-				}
-
-				fileListChan <- &s3.ObjectMeta{
-					Key: "file3", Size: 1500,
-				}
-
-				close(fileListChan)
-
-				errChan := make(chan error, 1)
-				awsStorageService.EXPECT().ListFilesInBucket(gomock.Any()).Return(fileListChan, errChan)
-
-				updateStateKeyFunc = func(statePath string) (func(stateKey string), func(), error) {
-					return func(stateKey string) {}, func() {}, nil
-				}
-
-				dStorageService.EXPECT().UpdateAllocationDetails().Return(nil)
-				dStorageService.EXPECT().GetAvailableSpace().Return(int64(1200))
-			},
-			wantErr: true,
-			err:     context.Canceled,
-		},
 		{
 			name: "success in uploading files",
 			setUpMock: func() {
@@ -87,37 +58,57 @@ func TestMigrate(t *testing.T) {
 				close(errChan)
 				awsStorageService.EXPECT().ListFilesInBucket(gomock.Any()).Return(fileListChan, errChan)
 
+				awsStorageService.EXPECT().DownloadToFile(gomock.Any(), "file1").Return("/aws/file1", nil)
+				awsStorageService.EXPECT().DownloadToFile(gomock.Any(), "file2").Return("/aws/file2", nil)
+				awsStorageService.EXPECT().DownloadToFile(gomock.Any(), "file3").Return("/aws/file3", nil)
+
 				updateStateKeyFunc = func(statePath string) (func(stateKey string), func(), error) {
 					return func(stateKey string) {}, func() {}, nil
 				}
 
-				dStorageService.EXPECT().UpdateAllocationDetails().Return(nil)
-				dStorageService.EXPECT().GetAvailableSpace().Return(int64(4200))
-				dStorageService.EXPECT().IsFileExist(gomock.Any(), gomock.Any()).AnyTimes().Return(false, nil)
-				awsStorageService.EXPECT().GetFileContent(gomock.Any(), "file1").Return(&s3.Object{}, nil)
-				awsStorageService.EXPECT().GetFileContent(gomock.Any(), "file2").Return(&s3.Object{}, nil)
-				awsStorageService.EXPECT().GetFileContent(gomock.Any(), "file3").Return(&s3.Object{}, nil)
-				dStorageService.EXPECT().Upload(gomock.Any(), "file1", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
-				dStorageService.EXPECT().Upload(gomock.Any(), "file2", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
-				dStorageService.EXPECT().Upload(gomock.Any(), "file3", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				dStorageService.EXPECT().IsFileExist(gomock.Any(), getRemotePath("file1")).Return(false, nil)
+				dStorageService.EXPECT().IsFileExist(gomock.Any(), getRemotePath("file2")).Return(false, nil)
+				dStorageService.EXPECT().IsFileExist(gomock.Any(), getRemotePath("file3")).Return(false, nil)
+
+				fileInfo := mock_util.NewMockFileInfo(ctrl)
+				file1Data := mock_util.NewMockFile(ctrl)
+				file1Data.EXPECT().Stat().Return(fileInfo, nil)
+				file1Data.EXPECT().Read(gomock.Any()).Return(1, nil)
+				file1Data.EXPECT().Seek(gomock.Any(), gomock.Any()).Return(int64(123), nil)
+				file1Data.EXPECT().Close().Return(nil)
+				file2Data := mock_util.NewMockFile(ctrl)
+				file2Data.EXPECT().Stat().Return(fileInfo, nil)
+				file2Data.EXPECT().Read(gomock.Any()).Return(1, nil)
+				file2Data.EXPECT().Seek(gomock.Any(), gomock.Any()).Return(int64(123), nil)
+				file2Data.EXPECT().Close().Return(nil)
+				file3Data := mock_util.NewMockFile(ctrl)
+				file3Data.EXPECT().Stat().Return(fileInfo, nil)
+				file3Data.EXPECT().Read(gomock.Any()).Return(1, nil)
+				file3Data.EXPECT().Seek(gomock.Any(), gomock.Any()).Return(int64(123), nil)
+				fileInfo.EXPECT().Size().AnyTimes().Return(int64(122))
+				file3Data.EXPECT().Close().Return(nil)
+
+				fileSystem.EXPECT().Open("/aws/file1").Return(file1Data, nil)
+				fileSystem.EXPECT().Open("/aws/file2").Return(file2Data, nil)
+				fileSystem.EXPECT().Open("/aws/file3").Return(file3Data, nil)
+
+				fileSystem.EXPECT().Remove("/aws/file1").Return(nil)
+				fileSystem.EXPECT().Remove("/aws/file2").Return(nil)
+				fileSystem.EXPECT().Remove("/aws/file3").Return(nil)
+
+				dStorageService.EXPECT().Upload(gomock.Any(), getRemotePath("file1"), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				dStorageService.EXPECT().Upload(gomock.Any(), getRemotePath("file2"), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				dStorageService.EXPECT().Upload(gomock.Any(), getRemotePath("file3"), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 			},
 			wantErr: false,
 		},
 		{
-			name: "aws get content error",
+			name: "download to file error",
 			setUpMock: func() {
 				rootContext, rootContextCancel = context.WithCancel(context.Background())
 				fileListChan := make(chan *s3.ObjectMeta, 1000)
 				fileListChan <- &s3.ObjectMeta{
 					Key: "file11", Size: 1200,
-				}
-
-				fileListChan <- &s3.ObjectMeta{
-					Key: "file22", Size: 1400,
-				}
-
-				fileListChan <- &s3.ObjectMeta{
-					Key: "file33", Size: 1500,
 				}
 
 				close(fileListChan)
@@ -130,18 +121,12 @@ func TestMigrate(t *testing.T) {
 					return func(stateKey string) {}, func() {}, nil
 				}
 
-				dStorageService.EXPECT().UpdateAllocationDetails().Return(nil)
-				dStorageService.EXPECT().GetAvailableSpace().Return(int64(4200))
-				dStorageService.EXPECT().IsFileExist(gomock.Any(), gomock.Any()).AnyTimes().Return(false, nil)
-				awsStorageService.EXPECT().GetFileContent(gomock.Any(), "file11").AnyTimes().Return(&s3.Object{}, nil)
-				awsStorageService.EXPECT().GetFileContent(gomock.Any(), "file33").AnyTimes().Return(&s3.Object{}, nil)
-				awsStorageService.EXPECT().GetFileContent(gomock.Any(), "file22").AnyTimes().Return(&s3.Object{}, errors.New("some error"))
-				dStorageService.EXPECT().Upload(gomock.Any(), "file11", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
-				dStorageService.EXPECT().Upload(gomock.Any(), "file22", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
-				dStorageService.EXPECT().Upload(gomock.Any(), "file33", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
+				dStorageService.EXPECT().IsFileExist(gomock.Any(), getRemotePath("file11")).Return(false, nil)
+
+				awsStorageService.EXPECT().DownloadToFile(gomock.Any(), "file11").AnyTimes().Return("", errors.New("some error"))
 			},
 			wantErr: true,
-			err:     context.Canceled,
+			err:     errors.New("some error"),
 		},
 		{
 			name: "dstorage upload error",
@@ -152,14 +137,6 @@ func TestMigrate(t *testing.T) {
 					Key: "file10", Size: 1200,
 				}
 
-				fileListChan <- &s3.ObjectMeta{
-					Key: "file20", Size: 1400,
-				}
-
-				fileListChan <- &s3.ObjectMeta{
-					Key: "file30", Size: 1500,
-				}
-
 				close(fileListChan)
 
 				errChan := make(chan error, 1)
@@ -170,18 +147,25 @@ func TestMigrate(t *testing.T) {
 					return func(stateKey string) {}, func() {}, nil
 				}
 
-				dStorageService.EXPECT().UpdateAllocationDetails().Return(nil)
-				dStorageService.EXPECT().GetAvailableSpace().Return(int64(4200))
-				dStorageService.EXPECT().IsFileExist(gomock.Any(), gomock.Any()).AnyTimes().Return(false, nil)
-				awsStorageService.EXPECT().GetFileContent(gomock.Any(), "file10").Return(&s3.Object{}, nil)
-				awsStorageService.EXPECT().GetFileContent(gomock.Any(), "file20").AnyTimes().Return(&s3.Object{}, nil)
-				awsStorageService.EXPECT().GetFileContent(gomock.Any(), "file30").Return(&s3.Object{}, nil)
-				dStorageService.EXPECT().Upload(gomock.Any(), "file10", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
-				dStorageService.EXPECT().Upload(gomock.Any(), "file20", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(errors.New("some error"))
-				dStorageService.EXPECT().Upload(gomock.Any(), "file30", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				dStorageService.EXPECT().IsFileExist(gomock.Any(), "file10").AnyTimes().Return(false, nil)
+				awsStorageService.EXPECT().DownloadToFile(gomock.Any(), "file10").Return("/aws/file10", nil)
+
+				fileInfo := mock_util.NewMockFileInfo(ctrl)
+				file1Data := mock_util.NewMockFile(ctrl)
+				file1Data.EXPECT().Stat().Return(fileInfo, nil).Times(3)
+				file1Data.EXPECT().Read(gomock.Any()).Return(1, nil).Times(3)
+				file1Data.EXPECT().Seek(gomock.Any(), gomock.Any()).Return(int64(123), nil).Times(3)
+				file1Data.EXPECT().Close().Return(nil).Times(3)
+
+				fileSystem.EXPECT().Open("/aws/file10").Return(file1Data, nil).Times(3)
+				fileSystem.EXPECT().Remove("/aws/file10").Return(nil)
+
+				fileInfo.EXPECT().Size().AnyTimes().Return(int64(122))
+
+				dStorageService.EXPECT().Upload(gomock.Any(), "file10", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.New("some error")).Times(3)
 			},
 			wantErr: true,
-			err:     context.Canceled,
+			err:     errors.New("after 3 attempts, last error: some error"),
 		},
 		{
 			name: "aws list object error",
@@ -208,7 +192,7 @@ func TestMigrate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setUpMock()
-			err := Migrate()
+			err := StartMigration()
 			log.Println(err)
 			if tt.wantErr != (err != nil) {
 				t.Errorf("s3-migration Migrate, wantErr: %v, got: %v", tt.wantErr, err)

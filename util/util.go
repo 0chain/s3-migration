@@ -99,7 +99,7 @@ func GetAwsCredentialsFromEnv() (string, string) {
 	return os.Getenv("AWS_ACCESS_KEY"), os.Getenv("AWS_SECRET_KEY")
 }
 
-// readLines reads a whole file into memory
+// readLines reads a whole File into memory
 // and returns a slice of its lines.
 func readLines(path string) ([]string, error) {
 	file, err := os.Open(path)
