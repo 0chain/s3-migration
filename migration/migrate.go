@@ -172,7 +172,7 @@ func StartMigration() error {
 		zlogger.Logger.Info("time taken: ", time.Now().Sub(start))
 	}(time.Now())
 
-	migrationWorker := util.NewMigrationWorker()
+	migrationWorker := NewMigrationWorker()
 	go migration.DownloadWorker(rootContext, migrationWorker)
 	go migration.UploadWorker(rootContext, migrationWorker)
 	migration.UpdateStateFile(migrationWorker)
@@ -185,7 +185,7 @@ func StartMigration() error {
 	return err
 }
 
-func (m *Migration) DownloadWorker(ctx context.Context, migrator *util.MigrationWorker) {
+func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorker) {
 	defer migrator.CloseDownloadQueue()
 	objCh, errCh := migration.awsStore.ListFilesInBucket(rootContext)
 	wg := &sync.WaitGroup{}
@@ -196,7 +196,7 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *util.Migration
 		}
 		wg.Add(1)
 
-		downloadObjMeta := &util.DownloadObjectMeta{
+		downloadObjMeta := &DownloadObjectMeta{
 			ObjectKey: obj.Key,
 			Size:      obj.Size,
 			DoneChan:  make(chan struct{}, 1),
@@ -232,14 +232,14 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *util.Migration
 	}
 }
 
-func (m *Migration) UploadWorker(ctx context.Context, migrator *util.MigrationWorker) {
+func (m *Migration) UploadWorker(ctx context.Context, migrator *MigrationWorker) {
 	defer migrator.CloseUploadQueue()
 	downloadQueue := migrator.GetDownloadQueue()
 	wg := &sync.WaitGroup{}
 	for d := range downloadQueue {
 		migrator.PauseUpload()
 		downloadObj := d
-		uploadObj := &util.UploadObjectMeta{
+		uploadObj := &UploadObjectMeta{
 			ObjectKey: downloadObj.ObjectKey,
 			DoneChan:  make(chan struct{}, 1),
 			ErrChan:   make(chan error, 1),
@@ -274,7 +274,7 @@ func getRemotePath(objectKey string) string {
 	return filepath.Join(migration.migrateTo, migration.bucket, objectKey)
 }
 
-func checkIsFileExist(ctx context.Context, downloadObj *util.DownloadObjectMeta) error {
+func checkIsFileExist(ctx context.Context, downloadObj *DownloadObjectMeta) error {
 	remotePath := getRemotePath(downloadObj.ObjectKey)
 
 	var isFileExist bool
@@ -294,7 +294,7 @@ func checkIsFileExist(ctx context.Context, downloadObj *util.DownloadObjectMeta)
 	return nil
 }
 
-func checkDownloadStatus(downloadObj *util.DownloadObjectMeta) error {
+func checkDownloadStatus(downloadObj *DownloadObjectMeta) error {
 	select {
 	case <-downloadObj.DoneChan:
 		return nil
@@ -303,7 +303,7 @@ func checkDownloadStatus(downloadObj *util.DownloadObjectMeta) error {
 	}
 }
 
-func processUpload(ctx context.Context, downloadObj *util.DownloadObjectMeta) error {
+func processUpload(ctx context.Context, downloadObj *DownloadObjectMeta) error {
 	remotePath := getRemotePath(downloadObj.ObjectKey)
 
 	fileObj, err := migration.fs.Open(downloadObj.LocalPath)
@@ -350,7 +350,7 @@ func processUpload(ctx context.Context, downloadObj *util.DownloadObjectMeta) er
 	}
 }
 
-func (m *Migration) UpdateStateFile(migrateHandler *util.MigrationWorker) {
+func (m *Migration) UpdateStateFile(migrateHandler *MigrationWorker) {
 	updateState, closeStateFile, err := updateStateKeyFunc(migration.stateFilePath)
 	if err != nil {
 		migrateHandler.SetMigrationError(err)
