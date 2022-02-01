@@ -95,23 +95,6 @@ func (d *DStorageService) GetFileMetaData(ctx context.Context, remotePath string
 	return &oResult.Refs[0], nil
 }
 
-func getChunkSizeNew(size int64, dataShards int) (chunkSize int64) {
-
-	var chunkNum int64 = 1
-	for {
-		chunkSize = (size + int64(dataShards)*chunkNum - 1) / (int64(dataShards) * chunkNum) //equivalent to math.ceil
-		if chunkSize <= MaxChunkSize {
-			break
-		}
-		chunkNum++
-	}
-
-	if chunkSize < MinChunkSize {
-		chunkSize = MinChunkSize
-	}
-	return
-}
-
 func getChunkSize(size int64) int64 {
 	var chunkSize int64
 	switch {

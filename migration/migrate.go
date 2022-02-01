@@ -26,7 +26,6 @@ const (
 )
 
 var migration Migration
-var isMigrationInitialized bool
 
 //Use context for all requests.
 var rootContext context.Context
@@ -121,8 +120,6 @@ func InitMigration(mConfig *MigrationConfig) error {
 		abandonAllOperations(zerror.ErrOperationCancelledByUser)
 	}()
 
-	isMigrationInitialized = true
-
 	return nil
 }
 
@@ -169,7 +166,7 @@ var updateStateKeyFunc = func(statePath string) (func(stateKey string), func(), 
 
 func StartMigration() error {
 	defer func(start time.Time) {
-		zlogger.Logger.Info("time taken: ", time.Now().Sub(start))
+		zlogger.Logger.Info("time taken: ", time.Since(start))
 	}(time.Now())
 
 	migrationWorker := NewMigrationWorker()
@@ -224,12 +221,11 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 		time.Sleep(1 * time.Second)
 	}
 	wg.Wait()
-	select {
-	case err := <-errCh:
-		if err != nil {
-			migrator.SetMigrationError(err)
-		}
+	err := <-errCh
+	if err != nil {
+		migrator.SetMigrationError(err)
 	}
+
 }
 
 func (m *Migration) UploadWorker(ctx context.Context, migrator *MigrationWorker) {
@@ -253,12 +249,13 @@ func (m *Migration) UploadWorker(ctx context.Context, migrator *MigrationWorker)
 				migrator.SetMigrationError(err)
 				return
 			}
-			defer m.fs.Remove(downloadObj.LocalPath)
+			defer func() {
+				_ = m.fs.Remove(downloadObj.LocalPath)
+			}()
 			migrator.UploadStart(uploadObj)
 			zlogger.Logger.Info("upload start", uploadObj.ObjectKey, uploadObj.Size)
 			err = util.Retry(3, time.Second*5, func() error {
-				var err error
-				err = processUpload(ctx, downloadObj)
+				err := processUpload(ctx, downloadObj)
 				return err
 			})
 			migrator.UploadDone(uploadObj, err)
@@ -278,8 +275,7 @@ func checkIsFileExist(ctx context.Context, downloadObj *DownloadObjectMeta) erro
 	remotePath := getRemotePath(downloadObj.ObjectKey)
 
 	var isFileExist bool
-	var err error
-	err = util.Retry(3, time.Second*5, func() error {
+	err := util.Retry(3, time.Second*5, func() error {
 		var err error
 		isFileExist, err = migration.zStore.IsFileExist(ctx, remotePath)
 		return err
@@ -315,6 +311,10 @@ func processUpload(ctx context.Context, downloadObj *DownloadObjectMeta) error {
 	defer fileObj.Close()
 
 	fileInfo, err := fileObj.Stat()
+	if err != nil {
+		zlogger.Logger.Error(err)
+		return err
+	}
 	mimeType, err := zboxutil.GetFileContentType(fileObj)
 	if err != nil {
 		zlogger.Logger.Error(err)
@@ -340,7 +340,7 @@ func processUpload(ctx context.Context, downloadObj *DownloadObjectMeta) error {
 		return err
 	} else {
 		if migration.deleteSource {
-			migration.awsStore.DeleteFile(ctx, downloadObj.ObjectKey)
+			_ = migration.awsStore.DeleteFile(ctx, downloadObj.ObjectKey)
 		}
 		migration.szCtMu.Lock()
 		migration.migratedSize += uint64(downloadObj.Size)
@@ -366,5 +366,4 @@ func (m *Migration) UpdateStateFile(migrateHandler *MigrationWorker) {
 			return
 		}
 	}
-	return
 }

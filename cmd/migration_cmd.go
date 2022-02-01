@@ -79,7 +79,7 @@ var migrateCmd = &cobra.Command{
 	Note: Addition of new object or modification of existing file while migrating is not recommended, as it cannot track such changes and you might loose your data.
 	`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cmd.Flags().Parse(args)
+		_ = cmd.Flags().Parse(args)
 		zlogger.Logger.Info("S3 migration started")
 		var err error
 		if allocationId == "" {

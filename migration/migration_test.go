@@ -27,7 +27,6 @@ func TestMigrate(t *testing.T) {
 		fs:       fileSystem,
 	}
 
-	isMigrationInitialized = true
 	tests := []struct {
 		name             string
 		setUpMock        func()

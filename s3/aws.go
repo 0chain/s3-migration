@@ -50,20 +50,6 @@ type AwsClient struct {
 }
 
 func GetAwsClient(bucket, prefix, region string, deleteSource bool, newerThan, olderThan *time.Time, startAfter, workDir string) (*AwsClient, error) {
-	//Get a client; if error return error else return aws client
-	//buckets comes as slice of array([bucketname, prefix]). Find location and put all of them
-	//in buckets field. If bucket is nil; then list all buckets from s3 and update the buckets field
-	// For example
-	// for _, bkt := range buckets{
-	// 	bucketName := bkt[0]
-	// 	prefix := bkt[1]
-	// 	location := "abc" // get from client
-	// 	awsClient.buckets = append(awsClient.buckets, bucket{
-	// 		Name: bucketName,
-	// 		Prefix: prefix,
-	// 		Location: location,
-	// 	})
-	// }
 
 	if region == "" {
 		region = "us-east-1"
