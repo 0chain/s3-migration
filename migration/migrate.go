@@ -195,6 +195,7 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 			DoneChan:  make(chan struct{}, 1),
 			ErrChan:   make(chan error, 1),
 		}
+		migrator.PushToDownloadQueue(downloadObjMeta)
 
 		go func() {
 			defer wg.Done()
@@ -205,6 +206,7 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 			}
 			if downloadObjMeta.IsFileAlreadyExist && migration.skip == Skip {
 				zlogger.Logger.Info("Skipping migration of object" + downloadObjMeta.ObjectKey)
+				downloadObjMeta.DoneChan <- struct{}{}
 				return
 			}
 			migrator.DownloadStart(downloadObjMeta)
@@ -237,12 +239,18 @@ func (m *Migration) UploadWorker(ctx context.Context, migrator *MigrationWorker)
 			ErrChan:   make(chan error, 1),
 			Size:      downloadObj.Size,
 		}
+		migrator.PushToUploadQueue(uploadObj)
+
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			err := checkDownloadStatus(downloadObj)
 			if err != nil {
 				migrator.SetMigrationError(err)
+				return
+			}
+			if downloadObj.LocalPath == "" {
+				uploadObj.DoneChan <- struct{}{}
 				return
 			}
 			defer func() {
