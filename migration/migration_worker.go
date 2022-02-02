@@ -99,8 +99,9 @@ func (m *MigrationWorker) UploadDone(u *UploadObjectMeta, err error) {
 	atomic.AddInt64(&m.currentUploadSize, -u.Size)
 	if err != nil {
 		u.ErrChan <- err
+	} else {
+		u.DoneChan <- struct{}{}
 	}
-	u.DoneChan <- struct{}{}
 }
 
 func (m *MigrationWorker) CloseUploadQueue() {

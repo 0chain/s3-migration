@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	zlogger "github.com/0chain/s3migration/logger"
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
 )
@@ -111,7 +112,7 @@ func ConvertGoSDKTimeToTime(in string) time.Time {
 func Retry(attempts int, sleep time.Duration, f func() error) (err error) {
 	for i := 0; i < attempts; i++ {
 		if err = f(); err != nil {
-			log.Println("retrying after error:", err)
+			zlogger.Logger.Error("retrying after error: ", err)
 			time.Sleep(sleep)
 			continue
 		}
