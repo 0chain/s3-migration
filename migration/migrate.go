@@ -50,9 +50,6 @@ type Migration struct {
 	skip       int
 	retryCount int
 
-	//Number of goroutines to run. So at most concurrency * Batch goroutines will run. i.e. for bucket level and object level
-	concurrency int
-
 	szCtMu               sync.Mutex //size and count mutex; used to update migratedSize and totalMigratedObjects
 	migratedSize         uint64
 	totalMigratedObjects uint64
@@ -100,7 +97,6 @@ func InitMigration(mConfig *MigrationConfig) error {
 		zStore:        dStorageService,
 		awsStore:      awsStorageService,
 		skip:          mConfig.Skip,
-		concurrency:   mConfig.Concurrency,
 		retryCount:    mConfig.RetryCount,
 		stateFilePath: mConfig.StateFilePath,
 		migrateTo:     mConfig.MigrateToPath,

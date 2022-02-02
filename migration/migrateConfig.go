@@ -5,7 +5,6 @@ import "time"
 type MigrationConfig struct {
 	AllocationID    string
 	Skip            int
-	Concurrency     int
 	Bucket          string
 	Region          string
 	Prefix          string
