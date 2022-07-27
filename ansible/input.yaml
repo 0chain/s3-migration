@@ -1,0 +1,21 @@
+#--------------------------Zboxcli-&-Zwalletcli------------------------------
+BlockWorker: https://kasten.devnet-0chain.net/dns
+create_wallet: "yes"
+check_balance: "yes"
+add_token: "yes"
+register_wallet: "yes"
+create_allocation: "yes"
+lock_tokens: 0.5          # pass lock only when create_allocation ( "yes" or "no" )
+#--------------------------S3-migration--------------------------------------
+encrypt_data: "yes"  # Pass this option to encrypt ( "yes" or "no" )
+delete_source: "yes"   # Delete object in s3 that is migrated to dStorage
+prefix: "k10/" # Migrate objects starting with this prefix ( string )
+S3BucketName: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"  # S3 Bucket to migrate name ( string )
+Remote_path: "/"  # Remote path where bucket's objects will be migrated to (default "/") ( string )
+retry: 5  # Retry count for upload to dstorage (default 3) ( int )
+skip: 1  # 0 --> Replace existing files; 1 --> Skip migration; 2 --> Duplicate (default 1) ( int )
+dup_suffix: ""  # Duplicate suffix to use for migrated file (default "_copy") ( string )
+older_newer: "newer"   # use only these 2 options newer/older ( string )     
+date_time: "10" # eg: 7d10h --> migrate objects that is newer than 7 days 10 hours or older than 7 days 10 hours
+concurrency: 10  # number of concurrent files to process concurrently during migration (default 10)
+add_more_flags: ""  # eg: --flag value  You can add more flags with there values ( string ) 

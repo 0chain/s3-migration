@@ -1,0 +1,46 @@
+---
+# tasks file for local_sys_req
+- name: update local system all packages to their latest version
+  apt:
+    name: "*"
+    state: latest 
+
+- name: Install build-essential and git
+  apt:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - build-essential
+    - git
+
+- name: Clone zwalletcli
+  git:
+    repo: 'https://github.com/0chain/zwalletcli.git'
+    dest: ~/zwalletcli
+    force: yes 
+
+- name: Clone zboxcli
+  git:
+    repo: 'https://github.com/0chain/zboxcli.git'
+    dest: ~/zboxcli
+    force: yes 
+
+- name: Install zwalletcli and zboxcli
+  make:
+    chdir: "{{ item }}"
+    target: install
+  loop:
+    - ~/zwalletcli
+    - ~/zboxcli
+  
+- name: Clone s3migration repo    
+  git:
+    repo: 'https://{{GITHUB_USERNAME}}:{{GITHUB_TOKEN}}@github.com/0chain/s3-migration.git'
+    dest: ~/s3-migration
+    force: yes
+
+- name : Build s3migration
+  shell: export PATH=$PATH:/usr/local/go/bin && go mod download && go build .
+  args:
+    executable: /bin/bash
+    chdir: ~/s3-migration

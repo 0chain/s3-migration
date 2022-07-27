@@ -1,0 +1,15 @@
+---
+# tasks file for zbox
+- name: copy zbox binaries
+  copy:
+    src: ~/zboxcli/zbox
+    dest: ~/
+    mode: u=rwx
+
+- name: register wallet
+  command: ./zbox register
+  when: register_wallet == "yes"
+
+- name: create allocation
+  command: ./zbox newallocation --lock {{ lock_tokens }}
+  when: create_allocation == "yes"

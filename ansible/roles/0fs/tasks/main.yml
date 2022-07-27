@@ -1,0 +1,38 @@
+---
+# tasks file for clone-s3migration
+
+- name: copy s3migration binaries
+  copy:
+    src: ~/s3-migration/s3migration
+    dest: ~/
+    mode: u=rwx
+
+- name: mount your directory to network
+  shell: nohup ./s3migration --help
+  when: 
+    - encrypt_data == "no"
+
+- name: mount your directory to network
+  shell: nohup ./s3migration 
+  when: 
+    - encrypt_data == "no"
+
+- name: mount your directory to network
+  shell: nohup ./s3migration 
+  when: 
+    - encrypt_data == "no"
+
+- name: mount your directory to network
+  shell: nohup ./s3migration 
+  when: 
+    - encrypt_data == "no"
+
+- name: mount your directory to network
+  shell: nohup ./s3migration 
+  when: 
+    - encrypt_data == "no"
+
+- name: mount your directory to network
+  shell: nohup ./s3migration 
+  when: 
+    - encrypt_data == "no"
