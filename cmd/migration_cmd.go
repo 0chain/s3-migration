@@ -26,7 +26,6 @@ var (
 	region                     string
 	migrateToPath              string
 	duplicateSuffix            string
-	concurrency                int
 	encrypt                    bool
 	resume                     bool
 	skip                       int // 0 --> Replace; 1 --> Skip; 2 --> Duplicate
@@ -59,7 +58,6 @@ func init() {
 	migrateCmd.Flags().StringVar(&duplicateSuffix, "dup-suffix", "_copy", "Duplicate suffix to use for migrated file")
 	migrateCmd.Flags().BoolVar(&deleteSource, "delete-source", false, "Delete object in s3 that is migrated to dStorage")
 	migrateCmd.Flags().StringVar(&workDir, "wd", filepath.Join(util.GetHomeDir(), ".s3migration"), "Working directory")
-	migrateCmd.Flags().IntVar(&concurrency, "concurrency", 10, "number of concurrent files to process concurrently during migration")
 	migrateCmd.Flags().BoolVar(&resume, "resume", false, "pass this option to resume migration from previous state")
 	migrateCmd.Flags().IntVar(&skip, "skip", 1, "0 --> Replace existing files; 1 --> Skip migration; 2 --> Duplicate")
 	migrateCmd.Flags().IntVar(&retryCount, "retry", 3, "retry count for upload to dstorage")
@@ -192,7 +190,6 @@ var migrateCmd = &cobra.Command{
 			AllocationID:    allocationId,
 			Region:          region,
 			Skip:            skip,
-			Concurrency:     concurrency,
 			Bucket:          bucket,
 			Prefix:          prefix,
 			MigrateToPath:   migrateToPath,

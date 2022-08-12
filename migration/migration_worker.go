@@ -84,10 +84,13 @@ func (m *MigrationWorker) PauseUpload() {
 	}
 }
 
+func (m *MigrationWorker) PushToUploadQueue(u *UploadObjectMeta) {
+	m.uploadQueue <- u
+}
+
 func (m *MigrationWorker) UploadStart(u *UploadObjectMeta) {
 	m.incrUploadConcurrency()
 	atomic.AddInt64(&m.currentUploadSize, u.Size)
-	m.uploadQueue <- u
 }
 
 func (m *MigrationWorker) UploadDone(u *UploadObjectMeta, err error) {
@@ -96,8 +99,9 @@ func (m *MigrationWorker) UploadDone(u *UploadObjectMeta, err error) {
 	atomic.AddInt64(&m.currentUploadSize, -u.Size)
 	if err != nil {
 		u.ErrChan <- err
+	} else {
+		u.DoneChan <- struct{}{}
 	}
-	u.DoneChan <- struct{}{}
 }
 
 func (m *MigrationWorker) CloseUploadQueue() {
@@ -126,9 +130,12 @@ func (m *MigrationWorker) PauseDownload() {
 	}
 }
 
+func (m *MigrationWorker) PushToDownloadQueue(d *DownloadObjectMeta) {
+	m.downloadQueue <- d
+}
+
 func (m *MigrationWorker) DownloadStart(d *DownloadObjectMeta) {
 	m.incrDownloadConcurrency()
-	m.downloadQueue <- d
 	m.updateFileSizeOnDisk(d.Size)
 	atomic.AddInt64(&m.currentDownloadSize, d.Size)
 }
