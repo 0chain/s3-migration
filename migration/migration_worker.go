@@ -7,6 +7,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	zlogger "github.com/0chain/s3migration/logger"
 )
 
 const (
@@ -34,15 +36,15 @@ func initUploadCountFD(fPath string) (func(), func()) {
 		count++
 		err := f.Truncate(0)
 		if err != nil {
-			// log error
+			zlogger.Logger.Error(err)
 		}
 		_, err = f.Seek(0, 0)
 		if err != nil {
-			//log error
+			zlogger.Logger.Error(err)
 		}
 		_, err = f.WriteString(strconv.FormatInt(count, 10))
 		if err != nil {
-			//log error
+			zlogger.Logger.Error(err)
 		}
 
 	}, func() { f.Close() }
@@ -141,8 +143,9 @@ func (m *MigrationWorker) UploadDone(u *UploadObjectMeta, err error) {
 	atomic.AddInt64(&m.currentUploadSize, -u.Size)
 	if err != nil {
 		u.ErrChan <- err
+	} else {
+		m.ucf()
 	}
-	m.ucf()
 	u.DoneChan <- struct{}{}
 }
 
@@ -173,6 +176,7 @@ func (m *MigrationWorker) PauseDownload() {
 }
 
 func (m *MigrationWorker) DownloadStart(d *DownloadObjectMeta) {
+	zlogger.Logger.Info("Started to download ", d.ObjectKey)
 	m.incrDownloadConcurrency()
 	m.downloadQueue <- d
 	m.updateFileSizeOnDisk(d.Size)
@@ -184,9 +188,11 @@ func (m *MigrationWorker) DownloadDone(d *DownloadObjectMeta, localPath string, 
 	atomic.AddInt64(&m.currentDownloadSize, -d.Size)
 	if err != nil {
 		d.ErrChan <- err
+		zlogger.Logger.Error("Error while downloading ", d.ObjectKey, " Error: ", err)
 	} else {
 		d.LocalPath = localPath
 		d.DoneChan <- struct{}{}
+		zlogger.Logger.Info("Downloaded ", d.ObjectKey)
 	}
 }
 
@@ -206,6 +212,7 @@ func (m *MigrationWorker) IsMigrationError() bool {
 
 func (m *MigrationWorker) SetMigrationError(err error) {
 	if err != nil {
+		zlogger.Logger.Error("Setting migration error: ", err)
 		m.errMutex.Lock()
 		defer m.errMutex.Unlock()
 		m.errInSystem = err
