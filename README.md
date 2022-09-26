@@ -56,7 +56,7 @@ occurred in previous migration session. User can also specify whether to delete 
 | prefix |  | Migrate objects starting with this prefix               |  | string    |
 | region |  | AWS S3 Bucket location               | us-east-2 | string    |
 | resume |  | pass this option to resume migration from previous state               | false | boolean    |
-| skip |  | 0 --> Replace existing files; 1 --> Skip migration; 2 --> Duplicate               | 1 | string    |
+| skip |  | 0 --> Replace existing files; 1 --> Skip migration; 2 --> Duplicate               | 1 | int    |
 | wd |  | Working directory               | $HOME/.s3migration | string    |
 
 ## BenchMark
