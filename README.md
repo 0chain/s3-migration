@@ -3,7 +3,7 @@ This program helps to migrate files in s3 bucket to 0chain dStorage.
 
 ## Running s3-migration
 
-When you run the `s3mgrt` command in terminal with no arguments, it will list all the available commands and the global flags.
+When you run the `s3migration` command in terminal with no arguments, it will list all the available commands and the global flags.
 
 **Command**|**Description**
 :-----:|:-----:
@@ -12,7 +12,7 @@ When you run the `s3mgrt` command in terminal with no arguments, it will list al
 
 ## Running Test cases
 
-`go run ./...`
+`go test ./...`
 
 ### Global Flags
 
@@ -32,10 +32,10 @@ Global Flags are parameters in s3mgrt that can be used with any command to overr
 
 `migrate` command is used to migrate files from s3 buckets to some remote directory(default is /) by using aws-s3-sdk and 0chain gosdk. All the objects from bucket will be migrated.
 However user can specify some prefix to migrate only the files with those prefix. Also if there is name conflict within dStorage file and bucket file use can
-specify whether to skip, replace or duplicate them. Migration state is maintained is some file so user can also resume migration operation if some error had
+specify whether to skip, replace or duplicate them. Migration state is maintained in some file so user can also resume migration operation if some error had
 occurred in previous migration session. User can also specify whether to delete migrated file. Note the defaults.
 
-	Note: Addition of new object or modification of existing file while migrating is not recommended, as it cannot track such changes and you might loose your data.
+	Note: Addition of new object or modification of existing file while migrating is not recommended, as it cannot track such changes and you might lose your data.
 
 | Flags          | Required | Description                                               | Default        | Valid Values |
 |--------------------|----------|-----------------------------------------------------------|----------------|--------------|
