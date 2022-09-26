@@ -211,8 +211,12 @@ var migrateCmd = &cobra.Command{
 		if err := migration.InitMigration(&mConfig); err != nil {
 			return err
 		}
-
-		return migration.StartMigration()
+		err = migration.StartMigration()
+		if err != nil {
+			return err
+		}
+		fmt.Println("Migration completed successfully")
+		return nil
 	},
 }
 
