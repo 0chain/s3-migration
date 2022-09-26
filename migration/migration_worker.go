@@ -20,7 +20,7 @@ const (
 )
 
 const (
-	uploadCountFileName = "uc.txt"
+	uploadCountFileName = "upload.count"
 )
 
 func initUploadCountFD(fPath string) (func(), func()) {
