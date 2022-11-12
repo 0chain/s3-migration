@@ -17,8 +17,11 @@
 
 # Dependency directories (remove the comment below to include it)
  vendor/
+s3-migration
+s3mgrt
 
 #ide
 .idea
 .vscode
 .gitignore
+s3migration

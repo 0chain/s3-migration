@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -56,7 +55,10 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&bSilent, "silent", false, "Do not show interactive sdk logs (shown by default)")
 }
 
+var VersionStr string
+
 func Execute() error {
+	rootCmd.Version = VersionStr
 	return rootCmd.Execute()
 }
 
@@ -126,12 +128,7 @@ func initConfig() {
 			os.Exit(1)
 		}
 
-		f, err := os.Open(walletFilePath)
-		if err != nil {
-			fmt.Println("Error opening the wallet", err)
-			os.Exit(1)
-		}
-		clientBytes, err := ioutil.ReadAll(f)
+		clientBytes, err := os.ReadFile(walletFilePath)
 		if err != nil {
 			fmt.Println("Error reading the wallet", err)
 			os.Exit(1)
