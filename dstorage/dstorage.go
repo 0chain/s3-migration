@@ -159,7 +159,7 @@ func (d *DStorageService) GetTotalSpace() int64 {
 	return d.allocation.Size
 }
 
-func GetDStorageService(allocationID, migrateTo, duplicateSuffix, workDir string, encrypt bool, whoPays int) (*DStorageService, error) {
+func GetDStorageService(allocationID, migrateTo, duplicateSuffix, workDir string, encrypt bool) (*DStorageService, error) {
 	allocation, err := sdk.GetAllocation(allocationID)
 
 	if err != nil {

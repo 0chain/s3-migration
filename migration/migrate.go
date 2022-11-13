@@ -73,7 +73,6 @@ func InitMigration(mConfig *MigrationConfig) error {
 		mConfig.DuplicateSuffix,
 		mConfig.WorkDir,
 		mConfig.Encrypt,
-		mConfig.WhoPays,
 	)
 	if err != nil {
 		zlogger.Logger.Error(err)

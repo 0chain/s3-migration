@@ -31,7 +31,6 @@ var (
 	resume                     bool
 	skip                       int // 0 --> Replace; 1 --> Skip; 2 --> Duplicate
 	allocationTextPath         string
-	ownerPays                  bool
 	newerThanStr, olderThanStr string
 	awsCredPath                string
 	retryCount                 int
@@ -183,11 +182,6 @@ var migrateCmd = &cobra.Command{
 			return err
 		}
 
-		var whoPays int
-		if !ownerPays {
-			whoPays = 1
-		}
-
 		mConfig := migration.MigrationConfig{
 			AllocationID:    allocationId,
 			Region:          region,
@@ -197,7 +191,6 @@ var migrateCmd = &cobra.Command{
 			Prefix:          prefix,
 			MigrateToPath:   migrateToPath,
 			DuplicateSuffix: duplicateSuffix,
-			WhoPays:         whoPays,
 			Encrypt:         encrypt,
 			RetryCount:      retryCount,
 			NewerThan:       newerThanPtr,

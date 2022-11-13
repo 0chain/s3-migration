@@ -11,7 +11,6 @@ type MigrationConfig struct {
 	Prefix          string
 	MigrateToPath   string
 	DuplicateSuffix string
-	WhoPays         int
 	Encrypt         bool
 	RetryCount      int
 	NewerThan       *time.Time
