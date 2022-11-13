@@ -22,14 +22,15 @@ import (
 )
 
 var (
-	cfgFile         string
-	networkFile     string
-	walletFile      string
-	walletClientID  string
-	walletClientKey string
-	configDir       string
-	nonce           int64
-	bSilent         bool
+	cfgFile          string
+	networkFile      string
+	walletFile       string
+	walletClientID   string
+	walletClientKey  string
+	walletPrivateKey string
+	configDir        string
+	nonce            int64
+	bSilent          bool
 
 	rootCmd = &cobra.Command{
 		Use:   "s3migration",
@@ -49,6 +50,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&walletFile, "wallet", "wallet.json", "wallet file")
 	rootCmd.PersistentFlags().StringVar(&walletClientID, "wallet_client_id", "", "wallet client_id")
 	rootCmd.PersistentFlags().StringVar(&walletClientKey, "wallet_client_key", "", "wallet client_key")
+	rootCmd.PersistentFlags().StringVar(&walletPrivateKey, "wallet_private_key", "", "wallet private key")
 	rootCmd.PersistentFlags().Int64Var(&nonce, "withNonce", 0, "nonce that will be used in transaction (default is 0)")
 
 	rootCmd.PersistentFlags().StringVar(&configDir, "configDir", util.GetDefaultConfigDir(), "configuration directory")
@@ -101,10 +103,19 @@ func initConfig() {
 
 	clientWallet := &zcncrypto.Wallet{}
 	if walletClientID != "" && walletClientKey != "" {
+		if walletPrivateKey == "" {
+			fmt.Println("Empty private key passed")
+			os.Exit(1)
+		}
 		clientWallet.ClientID = walletClientID
 		clientWallet.ClientKey = walletClientKey
-		var clientBytes []byte
+		keys := zcncrypto.KeyPair{
+			PublicKey:  walletClientKey,
+			PrivateKey: walletPrivateKey,
+		}
+		clientWallet.Keys = append(clientWallet.Keys, keys)
 
+		var clientBytes []byte
 		clientBytes, err = json.Marshal(clientWallet)
 		clientConfig = string(clientBytes)
 		if err != nil {
