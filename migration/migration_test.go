@@ -3,13 +3,14 @@ package migration
 import (
 	"context"
 	"errors"
+	"log"
+	"testing"
+
 	mock_dstorage "github.com/0chain/s3migration/dstorage/mocks"
 	"github.com/0chain/s3migration/s3"
 	mock_s3 "github.com/0chain/s3migration/s3/mocks"
 	mock_util "github.com/0chain/s3migration/util/mocks"
 	"github.com/golang/mock/gomock"
-	"log"
-	"testing"
 )
 
 func TestMigrate(t *testing.T) {
@@ -61,7 +62,7 @@ func TestMigrate(t *testing.T) {
 				awsStorageService.EXPECT().DownloadToFile(gomock.Any(), "file2").Return("/aws/file2", nil)
 				awsStorageService.EXPECT().DownloadToFile(gomock.Any(), "file3").Return("/aws/file3", nil)
 
-				updateStateKeyFunc = func(statePath string) (func(stateKey string), func(), error) {
+				updateKeyFunc = func(statePath string) (func(stateKey string), func(), error) {
 					return func(stateKey string) {}, func() {}, nil
 				}
 
@@ -116,7 +117,7 @@ func TestMigrate(t *testing.T) {
 				close(errChan)
 				awsStorageService.EXPECT().ListFilesInBucket(gomock.Any()).Return(fileListChan, errChan)
 
-				updateStateKeyFunc = func(statePath string) (func(stateKey string), func(), error) {
+				updateKeyFunc = func(statePath string) (func(stateKey string), func(), error) {
 					return func(stateKey string) {}, func() {}, nil
 				}
 
@@ -142,7 +143,7 @@ func TestMigrate(t *testing.T) {
 				close(errChan)
 				awsStorageService.EXPECT().ListFilesInBucket(gomock.Any()).Return(fileListChan, errChan)
 
-				updateStateKeyFunc = func(statePath string) (func(stateKey string), func(), error) {
+				updateKeyFunc = func(statePath string) (func(stateKey string), func(), error) {
 					return func(stateKey string) {}, func() {}, nil
 				}
 
@@ -179,7 +180,7 @@ func TestMigrate(t *testing.T) {
 
 				awsStorageService.EXPECT().ListFilesInBucket(gomock.Any()).Return(fileListChan, errChan)
 
-				updateStateKeyFunc = func(statePath string) (func(stateKey string), func(), error) {
+				updateKeyFunc = func(statePath string) (func(stateKey string), func(), error) {
 					return func(stateKey string) {}, func() {}, nil
 				}
 			},

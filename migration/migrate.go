@@ -57,11 +57,12 @@ type Migration struct {
 	migratedSize         uint64
 	totalMigratedObjects uint64
 
-	stateFilePath string
-	migrateTo     string
-	workDir       string
-	deleteSource  bool
-	bucket        string
+	stateFilePath    string
+	migratedFilePath string
+	migrateTo        string
+	workDir          string
+	deleteSource     bool
+	bucket           string
 }
 
 func InitMigration(mConfig *MigrationConfig) error {
@@ -96,17 +97,18 @@ func InitMigration(mConfig *MigrationConfig) error {
 	}
 
 	migration = Migration{
-		zStore:        dStorageService,
-		awsStore:      awsStorageService,
-		skip:          mConfig.Skip,
-		concurrency:   mConfig.Concurrency,
-		retryCount:    mConfig.RetryCount,
-		stateFilePath: mConfig.StateFilePath,
-		migrateTo:     mConfig.MigrateToPath,
-		deleteSource:  mConfig.DeleteSource,
-		workDir:       mConfig.WorkDir,
-		bucket:        mConfig.Bucket,
-		fs:            util.Fs,
+		zStore:           dStorageService,
+		awsStore:         awsStorageService,
+		skip:             mConfig.Skip,
+		concurrency:      mConfig.Concurrency,
+		retryCount:       mConfig.RetryCount,
+		stateFilePath:    mConfig.StateFilePath,
+		migratedFilePath: migration.migratedFilePath,
+		migrateTo:        mConfig.MigrateToPath,
+		deleteSource:     mConfig.DeleteSource,
+		workDir:          mConfig.WorkDir,
+		bucket:           mConfig.Bucket,
+		fs:               util.Fs,
 	}
 
 	rootContext, rootContextCancel = context.WithCancel(context.Background())
@@ -122,7 +124,7 @@ func InitMigration(mConfig *MigrationConfig) error {
 	return nil
 }
 
-var updateStateKeyFunc = func(statePath string) (func(stateKey string), func(), error) {
+var updateKeyFunc = func(statePath string) (func(stateKey string), func(), error) {
 	f, err := os.Create(statePath)
 	if err != nil {
 		return nil, nil, err
@@ -354,17 +356,28 @@ func processUpload(ctx context.Context, downloadObj *DownloadObjectMeta) error {
 }
 
 func (m *Migration) UpdateStateFile(migrateHandler *MigrationWorker) {
-	updateState, closeStateFile, err := updateStateKeyFunc(migration.stateFilePath)
+	updateState, closeStateFile, err := updateKeyFunc(migration.stateFilePath)
 	if err != nil {
 		migrateHandler.SetMigrationError(err)
 		return
 	}
 	defer closeStateFile()
+
+	updateMigratedFile, closeMigratedFile, err := updateKeyFunc(migration.migratedFilePath)
+	if err != nil {
+		migrateHandler.SetMigrationError(err)
+		return
+	}
+	defer closeMigratedFile()
+
 	uploadQueue := migrateHandler.GetUploadQueue()
+	var totalMigrated int
 	for u := range uploadQueue {
 		select {
 		case <-u.DoneChan:
 			updateState(u.ObjectKey)
+			totalMigrated++
+			updateMigratedFile(strconv.Itoa(totalMigrated))
 		case <-u.ErrChan:
 			return
 		}
