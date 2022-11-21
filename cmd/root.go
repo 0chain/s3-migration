@@ -22,15 +22,13 @@ import (
 )
 
 var (
-	cfgFile          string
-	networkFile      string
-	walletFile       string
-	walletClientID   string
-	walletClientKey  string
-	walletPrivateKey string
-	configDir        string
-	nonce            int64
-	bSilent          bool
+	cfgFile         string
+	networkFile     string
+	walletFile      string
+	walletClientKey string
+	configDir       string
+	nonce           int64
+	bSilent         bool
 
 	rootCmd = &cobra.Command{
 		Use:   "s3migration",
@@ -48,9 +46,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "config.yaml", "config file")
 	rootCmd.PersistentFlags().StringVar(&networkFile, "network", "network.yaml", "network file to overwrite the network details")
 	rootCmd.PersistentFlags().StringVar(&walletFile, "wallet", "wallet.json", "wallet file")
-	rootCmd.PersistentFlags().StringVar(&walletClientID, "wallet_client_id", "", "wallet client_id")
-	rootCmd.PersistentFlags().StringVar(&walletClientKey, "wallet_client_key", "", "wallet client_key")
-	rootCmd.PersistentFlags().StringVar(&walletPrivateKey, "wallet_private_key", "", "wallet private key")
+	rootCmd.PersistentFlags().StringVar(&walletClientKey, "wallet_client_key", "", "wallet private key")
 	rootCmd.PersistentFlags().Int64Var(&nonce, "withNonce", 0, "nonce that will be used in transaction (default is 0)")
 
 	rootCmd.PersistentFlags().StringVar(&configDir, "configDir", util.GetDefaultConfigDir(), "configuration directory")
@@ -101,27 +97,25 @@ func initConfig() {
 		panic(err)
 	}
 
-	clientWallet := &zcncrypto.Wallet{}
-	if walletClientID != "" && walletClientKey != "" {
-		if walletPrivateKey == "" {
-			fmt.Println("Empty private key passed")
+	if walletClientKey != "" {
+
+		scheme := zcncrypto.NewSignatureScheme(cfg.SignatureScheme)
+		err = scheme.SetPrivateKey(walletClientKey)
+		if err != nil {
+			fmt.Println("wallet: ", err)
 			os.Exit(1)
 		}
-		clientWallet.ClientID = walletClientID
-		clientWallet.ClientKey = walletClientKey
-		keys := zcncrypto.KeyPair{
-			PublicKey:  walletClientKey,
-			PrivateKey: walletPrivateKey,
+
+		clientWallet, err := scheme.SplitKeys(1)
+		if err != nil {
+			fmt.Println("wallet: ", err)
+			os.Exit(1)
 		}
-		clientWallet.Keys = append(clientWallet.Keys, keys)
 
 		var clientBytes []byte
-		clientBytes, err = json.Marshal(clientWallet)
+		clientBytes, _ = json.Marshal(clientWallet)
 		clientConfig = string(clientBytes)
-		if err != nil {
-			fmt.Println("Invalid wallet data passed:" + walletClientID + " " + walletClientKey)
-			os.Exit(1)
-		}
+
 	} else {
 		var walletFilePath string
 		if walletFile != "" {
@@ -146,9 +140,7 @@ func initConfig() {
 		}
 		clientConfig = string(clientBytes)
 
-		//minerjson, _ := json.Marshal(miners)
-		//sharderjson, _ := json.Marshal(sharders)
-		err = json.Unmarshal([]byte(clientConfig), clientWallet)
+		err = json.Unmarshal([]byte(clientConfig), &zcncrypto.Wallet{})
 		if err != nil {
 			fmt.Println("Invalid wallet at path:" + walletFilePath)
 			os.Exit(1)

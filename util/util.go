@@ -2,7 +2,6 @@ package util
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
@@ -10,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
 )
 
@@ -31,7 +29,7 @@ func GetDefaultConfigDir() string {
 
 // GetHomeDir Find home directory.
 func GetHomeDir() string {
-	idr, err := homedir.Dir()
+	idr, err := os.UserHomeDir()
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -42,7 +40,7 @@ func GetHomeDir() string {
 
 func GetAllocationIDFromFile(allocPath string) (allocationId string, err error) {
 	var b []byte
-	b, err = ioutil.ReadFile(allocPath)
+	b, err = os.ReadFile(allocPath)
 	if err != nil {
 		return
 	}
