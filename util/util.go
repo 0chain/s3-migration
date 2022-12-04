@@ -62,7 +62,7 @@ func GetAwsCredentialsFromFile(credPath string) (accessKey, secretKey string) {
 	if err != nil {
 		panic(err)
 	}
-
+	defer f.Close()
 	v := viper.New()
 	v.SetConfigType("yaml")
 	if err := v.ReadConfig(f); err != nil {
@@ -76,11 +76,15 @@ func GetAwsCredentialsFromFile(credPath string) (accessKey, secretKey string) {
 }
 
 func GetBucketRegionPrefixFromFile(credPath string) (bucket, region, prefix string, err error) {
-	v := viper.New()
+	f, err := os.Open(credPath)
+	if err != nil {
+		return
+	}
+	defer f.Close()
 
-	v.AddConfigPath(credPath)
+	v := viper.New()
 	v.SetConfigType("yaml")
-	if err = v.ReadInConfig(); err != nil {
+	if err = v.ReadConfig(f); err != nil {
 		return
 	}
 
