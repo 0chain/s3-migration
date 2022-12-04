@@ -58,18 +58,20 @@ func SetAwsEnvCredentials(accessKey, secretKey string) (err error) {
 }
 
 func GetAwsCredentialsFromFile(credPath string) (accessKey, secretKey string) {
+	f, err := os.Open(credPath)
+	if err != nil {
+		panic(err)
+	}
+
 	v := viper.New()
-
-	v.AddConfigPath(credPath)
 	v.SetConfigType("yaml")
-
-	if err := v.ReadInConfig(); err != nil {
-		return
+	if err := v.ReadConfig(f); err != nil {
+		panic(err)
+		// return
 	}
 
 	accessKey = v.GetString("aws_access_key")
 	secretKey = v.GetString("aws_secret_key")
-
 	return
 }
 
