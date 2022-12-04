@@ -25,7 +25,6 @@ Global Flags are parameters in s3mgrt that can be used with any command to overr
 | -h, --help                 | Gives more information about a particular command.           | s3mgrt migrate --help                             |
 | --network string           | Specify a network file to overwrite the network details(default is [$HOME/.zcn/network.yaml](#zcnnetworkyaml)) | s3mgrt migrate --network network1.yaml            |
 | --wallet string            | Specify a wallet file or 2nd wallet (default is $HOME/.zcn/wallet.json) | s3mgrt migrate --wallet wallet2.json              |
-| --wallet_client_id string  | Specify a wallet client id (By default client_id specified in $HOME/.zcn/wallet.json is used) | s3mgrt migrate --wallet_client_id <client_id>     |
 | --wallet_client_key string | Specify a wallet client_key (By default client_key specified in $HOME/.zcn/wallet.json is used) | s3mgrt migrate --wallet_client_key  < client_key> |
 
 ## Migrate Command

@@ -117,11 +117,11 @@ func initConfig() {
 
 		var clientBytes []byte
 		clientBytes, err = json.Marshal(clientWallet)
-		clientConfig = string(clientBytes)
 		if err != nil {
-			fmt.Println("Invalid wallet data passed:" + walletClientID + " " + walletClientKey)
+			fmt.Println("wallet: ", err)
 			os.Exit(1)
 		}
+		clientConfig = string(clientBytes)
 	} else {
 		var walletFilePath string
 		if walletFile != "" {
@@ -146,9 +146,7 @@ func initConfig() {
 		}
 		clientConfig = string(clientBytes)
 
-		//minerjson, _ := json.Marshal(miners)
-		//sharderjson, _ := json.Marshal(sharders)
-		err = json.Unmarshal([]byte(clientConfig), clientWallet)
+		err = json.Unmarshal([]byte(clientConfig), &zcncrypto.Wallet{})
 		if err != nil {
 			fmt.Println("Invalid wallet at path:" + walletFilePath)
 			os.Exit(1)
