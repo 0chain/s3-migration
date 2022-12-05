@@ -103,7 +103,7 @@ func InitMigration(mConfig *MigrationConfig) error {
 		concurrency:      mConfig.Concurrency,
 		retryCount:       mConfig.RetryCount,
 		stateFilePath:    mConfig.StateFilePath,
-		migratedFilePath: migration.migratedFilePath,
+		migratedFilePath: mConfig.MigratedFilePath,
 		migrateTo:        mConfig.MigrateToPath,
 		deleteSource:     mConfig.DeleteSource,
 		workDir:          mConfig.WorkDir,
@@ -130,13 +130,13 @@ var updateKeyFunc = func(statePath string) (func(stateKey string), func(), error
 		return nil, nil, err
 	}
 	var errorWhileWriting bool
-	stateKeyUpdater := func(stateKey string) {
+	keyUpdater := func(key string) {
 		if errorWhileWriting {
 			f, err = os.Create(statePath)
 			if err != nil {
 				return
 			}
-			_, err = f.Write([]byte(stateKey))
+			_, err = f.Write([]byte(key))
 			if err != nil {
 				return
 			}
@@ -154,7 +154,7 @@ var updateKeyFunc = func(statePath string) (func(stateKey string), func(), error
 			return
 		}
 
-		_, err = f.Write([]byte(stateKey))
+		_, err = f.Write([]byte(key))
 		if err != nil {
 			errorWhileWriting = true
 		}
@@ -162,7 +162,7 @@ var updateKeyFunc = func(statePath string) (func(stateKey string), func(), error
 
 	fileCloser := func() { f.Close() }
 
-	return stateKeyUpdater, fileCloser, nil
+	return keyUpdater, fileCloser, nil
 }
 
 func StartMigration() error {
@@ -205,6 +205,7 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 			defer wg.Done()
 			err := checkIsFileExist(ctx, downloadObjMeta)
 			if err != nil {
+				zlogger.Logger.Error(err)
 				migrator.SetMigrationError(err)
 				return
 			}
@@ -215,6 +216,9 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 			migrator.DownloadStart(downloadObjMeta)
 			zlogger.Logger.Info("download start", downloadObjMeta.ObjectKey, downloadObjMeta.Size)
 			downloadPath, err := m.awsStore.DownloadToFile(ctx, downloadObjMeta.ObjectKey)
+			if err != nil {
+				zlogger.Logger.Error(err)
+			}
 			migrator.DownloadDone(downloadObjMeta, downloadPath, err)
 			migrator.SetMigrationError(err)
 			zlogger.Logger.Info("download done", downloadObjMeta.ObjectKey, downloadObjMeta.Size, err)
@@ -224,6 +228,7 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 	wg.Wait()
 	err := <-errCh
 	if err != nil {
+		zlogger.Logger.Error(err)
 		migrator.SetMigrationError(err)
 	}
 
@@ -251,6 +256,7 @@ func (m *Migration) UploadWorker(ctx context.Context, migrator *MigrationWorker)
 			defer wg.Done()
 			err := checkDownloadStatus(downloadObj)
 			if err != nil {
+				zlogger.Logger.Error(err)
 				migrator.SetMigrationError(err)
 				return
 			}
@@ -258,11 +264,14 @@ func (m *Migration) UploadWorker(ctx context.Context, migrator *MigrationWorker)
 				_ = m.fs.Remove(downloadObj.LocalPath)
 			}()
 			migrator.UploadStart(uploadObj)
-			zlogger.Logger.Info("upload start", uploadObj.ObjectKey, uploadObj.Size)
+			zlogger.Logger.Info("upload start; ", uploadObj.ObjectKey, uploadObj.Size)
 			err = util.Retry(3, time.Second*5, func() error {
 				err := processUpload(ctx, downloadObj)
 				return err
 			})
+			if err != nil {
+				zlogger.Logger.Error(err)
+			}
 			migrator.UploadDone(uploadObj, err)
 			migrator.SetMigrationError(err)
 			zlogger.Logger.Info("upload done", uploadObj.ObjectKey, uploadObj.Size, err)
@@ -345,7 +354,9 @@ func processUpload(ctx context.Context, downloadObj *DownloadObjectMeta) error {
 		return err
 	} else {
 		if migration.deleteSource {
-			_ = migration.awsStore.DeleteFile(ctx, downloadObj.ObjectKey)
+			if err := migration.awsStore.DeleteFile(ctx, downloadObj.ObjectKey); err != nil {
+				zlogger.Logger.Error(err)
+			}
 		}
 		migration.szCtMu.Lock()
 		migration.migratedSize += uint64(downloadObj.Size)
@@ -358,6 +369,7 @@ func processUpload(ctx context.Context, downloadObj *DownloadObjectMeta) error {
 func (m *Migration) UpdateStateFile(migrateHandler *MigrationWorker) {
 	updateState, closeStateFile, err := updateKeyFunc(migration.stateFilePath)
 	if err != nil {
+		zlogger.Logger.Error(err)
 		migrateHandler.SetMigrationError(err)
 		return
 	}
@@ -365,6 +377,7 @@ func (m *Migration) UpdateStateFile(migrateHandler *MigrationWorker) {
 
 	updateMigratedFile, closeMigratedFile, err := updateKeyFunc(migration.migratedFilePath)
 	if err != nil {
+		zlogger.Logger.Error(err, " migrated file path: ", migration.migratedFilePath)
 		migrateHandler.SetMigrationError(err)
 		return
 	}
