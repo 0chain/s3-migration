@@ -128,10 +128,10 @@ func initConfig() {
 			if filepath.IsAbs(walletFile) {
 				walletFilePath = walletFile
 			} else {
-				walletFilePath = configDir + string(os.PathSeparator) + walletFile
+				walletFilePath = filepath.Join(configDir, walletFile)
 			}
 		} else {
-			walletFilePath = configDir + string(os.PathSeparator) + "wallet.json"
+			walletFilePath = filepath.Join(configDir, "wallet.json")
 		}
 
 		if _, err = os.Stat(walletFilePath); os.IsNotExist(err) {

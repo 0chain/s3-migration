@@ -156,6 +156,10 @@ var migrateCmd = &cobra.Command{
 			workDir = filepath.Join(util.GetHomeDir(), ".s3migration")
 		}
 
+		if err := os.RemoveAll(workDir); err != nil {
+			return err
+		}
+
 		if err := os.MkdirAll(workDir, 0755); err != nil {
 			return err
 		}

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -188,6 +189,7 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 	objCh, errCh := migration.awsStore.ListFilesInBucket(rootContext)
 	wg := &sync.WaitGroup{}
 	for obj := range objCh {
+		zlogger.Logger.Info("Downloading object: ", obj.Key)
 		migrator.PauseDownload()
 		if migrator.IsMigrationError() {
 			return
@@ -211,6 +213,8 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 			}
 			if downloadObjMeta.IsFileAlreadyExist && migration.skip == Skip {
 				zlogger.Logger.Info("Skipping migration of object" + downloadObjMeta.ObjectKey)
+				migrator.DownloadStart(downloadObjMeta)
+				migrator.DownloadDone(downloadObjMeta, "", nil)
 				return
 			}
 			migrator.DownloadStart(downloadObjMeta)
@@ -243,6 +247,7 @@ func (m *Migration) UploadWorker(ctx context.Context, migrator *MigrationWorker)
 	downloadQueue := migrator.GetDownloadQueue()
 	wg := &sync.WaitGroup{}
 	for d := range downloadQueue {
+		zlogger.Logger.Info("Uploading object: ", d.ObjectKey)
 		migrator.PauseUpload()
 		downloadObj := d
 		uploadObj := &UploadObjectMeta{
@@ -260,6 +265,20 @@ func (m *Migration) UploadWorker(ctx context.Context, migrator *MigrationWorker)
 				migrator.SetMigrationError(err)
 				return
 			}
+			if strings.HasSuffix(downloadObj.ObjectKey, "/") { // It is a prefix
+				zlogger.Logger.Info("Skipping prefix migration. Prefix: ", downloadObj.ObjectKey)
+				return
+			}
+
+			if downloadObj.IsFileAlreadyExist {
+				switch migration.skip {
+				case Skip:
+					migrator.UploadStart(uploadObj)
+					migrator.UploadDone(uploadObj, nil)
+					return
+				}
+			}
+
 			defer func() {
 				_ = m.fs.Remove(downloadObj.LocalPath)
 			}()
@@ -331,7 +350,7 @@ func processUpload(ctx context.Context, downloadObj *DownloadObjectMeta) error {
 	}
 	mimeType, err := zboxutil.GetFileContentType(fileObj)
 	if err != nil {
-		zlogger.Logger.Error(err)
+		zlogger.Logger.Error("content type error: ", err, " file: ", fileInfo.Name(), " objKey:", downloadObj.ObjectKey)
 		return err
 	}
 
