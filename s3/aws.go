@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/0chain/gosdk/core/encryption"
@@ -172,6 +173,10 @@ func (a *AwsClient) ListFilesInBucket(ctx context.Context) (<-chan *ObjectMeta, 
 			}
 
 			for _, obj := range page.Contents {
+				if strings.HasSuffix(aws.ToString(obj.Key), "/") {
+					zlogger.Logger.Info("Skipping prefix migration")
+					continue
+				}
 				creationTime := aws.ToTime(obj.LastModified)
 				if a.newerThan != nil && creationTime.Before(*a.newerThan) {
 					continue
