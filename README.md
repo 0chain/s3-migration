@@ -21,11 +21,13 @@ Global Flags are parameters in s3mgrt that can be used with any command to overr
 | Flags                      | Description                                                  | Usage                                             |
 | -------------------------- | ------------------------------------------------------------ | ------------------------------------------------- |
 | --config string            | Specify configuration file (default is [$HOME/.zcn/config.yaml](#zcnconfigyaml)) | s3mgrt migrate --config config1.yaml              |
-| --configDir string         | Specify a configuration directory (default is $HOME/.zcn) | s3mgrt migrate --configDir /$HOME/.zcn2           |
-| -h, --help                 | Gives more information about a particular command.           | s3mgrt migrate --help                             |
-| --network string           | Specify a network file to overwrite the network details(default is [$HOME/.zcn/network.yaml](#zcnnetworkyaml)) | s3mgrt migrate --network network1.yaml            |
-| --wallet string            | Specify a wallet file or 2nd wallet (default is $HOME/.zcn/wallet.json) | s3mgrt migrate --wallet wallet2.json              |
-| --wallet_client_key string | Specify a wallet client_key (By default client_key specified in $HOME/.zcn/wallet.json is used) | s3mgrt migrate --wallet_client_key  < client_key> |
+| --configDir string         | Specify a configuration directory (default is $HOME/.zcn) | s3migration migrate --configDir /$HOME/.zcn2           |
+| -h, --help                 | Gives more information about a particular command.           | s3migration migrate --help                             |
+| --network string           | Specify a network file to overwrite the network details(default is [$HOME/.zcn/network.yaml](#zcnnetworkyaml)) | s3migration migrate --network network1.yaml            |
+| --wallet string            | Specify a wallet file or 2nd wallet (default is $HOME/.zcn/wallet.json) | s3migration migrate --wallet wallet2.json              |
+| --wallet_client_id string  | Specify client id. If wallet key is also provided then wallet_private_key is required | s3migration migrate --wallet_client_id "wallet client id" |
+| --wallet_client_key string | Specify a wallet client_key (By default client_key specified in $HOME/.zcn/wallet.json is used) | s3migration migrate --wallet_client_key  "client key" |
+| --wallet_private_key string | Specify wallet private key| s3migration migrate --wallet_private_key "wallet private key"|
 
 ## Migrate Command
 
