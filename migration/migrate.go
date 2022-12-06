@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -19,11 +18,16 @@ import (
 	zerror "github.com/0chain/s3migration/zErrors"
 )
 
+// TODO add total files to migrate
 const Batch = 10
 const (
 	Replace   = iota //Will replace existing file
 	Skip             // Will skip migration if file already exists
 	Duplicate        // Will add _copy prefix and uploads the file
+)
+
+const (
+	uploadCountFileName = "upload.count"
 )
 
 var migration Migration
@@ -58,12 +62,38 @@ type Migration struct {
 	migratedSize         uint64
 	totalMigratedObjects uint64
 
-	stateFilePath    string
-	migratedFilePath string
-	migrateTo        string
-	workDir          string
-	deleteSource     bool
-	bucket           string
+	stateFilePath string
+	migrateTo     string
+	workDir       string
+	deleteSource  bool
+	bucket        string
+}
+
+func updateTotalObjects(awsStorageService *s3.AwsClient, wd string) error {
+	f, err := os.Create(filepath.Join(wd, "files.total"))
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	var totalFiles int
+	objCh, errCh := awsStorageService.ListFilesInBucket(context.Background())
+
+L1:
+	for {
+		select {
+		case _, ok := <-objCh:
+			if !ok {
+				break L1
+			}
+			totalFiles++
+		case err = <-errCh:
+			return err
+		}
+	}
+
+	_, err = f.WriteString(strconv.Itoa(totalFiles))
+	return err
 }
 
 func InitMigration(mConfig *MigrationConfig) error {
@@ -97,19 +127,20 @@ func InitMigration(mConfig *MigrationConfig) error {
 		return err
 	}
 
+	updateTotalObjects(awsStorageService, mConfig.WorkDir)
+
 	migration = Migration{
-		zStore:           dStorageService,
-		awsStore:         awsStorageService,
-		skip:             mConfig.Skip,
-		concurrency:      mConfig.Concurrency,
-		retryCount:       mConfig.RetryCount,
-		stateFilePath:    mConfig.StateFilePath,
-		migratedFilePath: mConfig.MigratedFilePath,
-		migrateTo:        mConfig.MigrateToPath,
-		deleteSource:     mConfig.DeleteSource,
-		workDir:          mConfig.WorkDir,
-		bucket:           mConfig.Bucket,
-		fs:               util.Fs,
+		zStore:        dStorageService,
+		awsStore:      awsStorageService,
+		skip:          mConfig.Skip,
+		concurrency:   mConfig.Concurrency,
+		retryCount:    mConfig.RetryCount,
+		stateFilePath: mConfig.StateFilePath,
+		migrateTo:     mConfig.MigrateToPath,
+		deleteSource:  mConfig.DeleteSource,
+		workDir:       mConfig.WorkDir,
+		bucket:        mConfig.Bucket,
+		fs:            util.Fs,
 	}
 
 	rootContext, rootContextCancel = context.WithCancel(context.Background())
@@ -241,7 +272,6 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 func (m *Migration) UploadWorker(ctx context.Context, migrator *MigrationWorker) {
 	defer func() {
 		migrator.CloseUploadQueue()
-		migrator.fc()
 	}()
 
 	downloadQueue := migrator.GetDownloadQueue()
@@ -265,11 +295,6 @@ func (m *Migration) UploadWorker(ctx context.Context, migrator *MigrationWorker)
 				migrator.SetMigrationError(err)
 				return
 			}
-			if strings.HasSuffix(downloadObj.ObjectKey, "/") { // It is a prefix
-				zlogger.Logger.Info("Skipping prefix migration. Prefix: ", downloadObj.ObjectKey)
-				return
-			}
-
 			if downloadObj.IsFileAlreadyExist {
 				switch migration.skip {
 				case Skip:
@@ -394,9 +419,9 @@ func (m *Migration) UpdateStateFile(migrateHandler *MigrationWorker) {
 	}
 	defer closeStateFile()
 
-	updateMigratedFile, closeMigratedFile, err := updateKeyFunc(migration.migratedFilePath)
+	updateMigratedFile, closeMigratedFile, err := updateKeyFunc(filepath.Join(migration.workDir, uploadCountFileName))
 	if err != nil {
-		zlogger.Logger.Error(err, " migrated file path: ", migration.migratedFilePath)
+		zlogger.Logger.Error(err)
 		migrateHandler.SetMigrationError(err)
 		return
 	}
