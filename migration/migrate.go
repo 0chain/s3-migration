@@ -88,7 +88,9 @@ L1:
 			}
 			totalFiles++
 		case err = <-errCh:
-			return err
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -127,7 +129,11 @@ func InitMigration(mConfig *MigrationConfig) error {
 		return err
 	}
 
-	updateTotalObjects(awsStorageService, mConfig.WorkDir)
+	err = updateTotalObjects(awsStorageService, mConfig.WorkDir)
+	if err != nil {
+		zlogger.Logger.Error(err)
+		return err
+	}
 
 	migration = Migration{
 		zStore:        dStorageService,
