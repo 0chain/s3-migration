@@ -101,6 +101,7 @@ func (m *MigrationWorker) UploadDone(u *UploadObjectMeta, err error) {
 	m.decrUploadConcurrency()
 	atomic.AddInt64(&m.currentUploadSize, -u.Size)
 	if err != nil {
+		zlogger.Logger.Error("Error while uploading ", u.ObjectKey, " Error: ", err)
 		u.ErrChan <- err
 	} else {
 		u.DoneChan <- struct{}{}

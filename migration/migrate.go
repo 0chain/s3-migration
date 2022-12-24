@@ -18,7 +18,6 @@ import (
 	zerror "github.com/0chain/s3migration/zErrors"
 )
 
-// TODO add total files to migrate
 const Batch = 10
 const (
 	Replace   = iota //Will replace existing file
@@ -257,9 +256,6 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 			migrator.DownloadStart(downloadObjMeta)
 			zlogger.Logger.Info("download start", downloadObjMeta.ObjectKey, downloadObjMeta.Size)
 			downloadPath, err := m.awsStore.DownloadToFile(ctx, downloadObjMeta.ObjectKey)
-			if err != nil {
-				zlogger.Logger.Error(err)
-			}
 			migrator.DownloadDone(downloadObjMeta, downloadPath, err)
 			migrator.SetMigrationError(err)
 			zlogger.Logger.Info("download done", downloadObjMeta.ObjectKey, downloadObjMeta.Size, err)
@@ -319,9 +315,7 @@ func (m *Migration) UploadWorker(ctx context.Context, migrator *MigrationWorker)
 				err := processUpload(ctx, downloadObj)
 				return err
 			})
-			if err != nil {
-				zlogger.Logger.Error(err)
-			}
+
 			migrator.UploadDone(uploadObj, err)
 			migrator.SetMigrationError(err)
 			zlogger.Logger.Info("upload done", uploadObj.ObjectKey, uploadObj.Size, err)

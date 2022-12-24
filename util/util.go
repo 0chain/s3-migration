@@ -69,7 +69,6 @@ func GetAwsCredentialsFromFile(credPath string) (accessKey, secretKey string) {
 	v.SetConfigType("yaml")
 	if err := v.ReadConfig(f); err != nil {
 		panic(err)
-		// return
 	}
 
 	accessKey = v.GetString("aws_access_key")
