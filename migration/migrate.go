@@ -3,6 +3,7 @@ package migration
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -27,6 +28,7 @@ const (
 
 const (
 	uploadCountFileName = "upload.count"
+	sourceDeleteFailed  = "source_delete.failed"
 )
 
 var migration Migration
@@ -34,6 +36,7 @@ var migration Migration
 //Use context for all requests.
 var rootContext context.Context
 var rootContextCancel context.CancelFunc
+var dsFileHandler io.WriteCloser
 
 var StateFilePath = func(workDir, bucketName string) string {
 	return fmt.Sprintf("%v/%v.state", workDir, bucketName)
@@ -206,6 +209,15 @@ func StartMigration() error {
 	defer func(start time.Time) {
 		zlogger.Logger.Info("time taken: ", time.Since(start))
 	}(time.Now())
+
+	if migration.deleteSource {
+		f, err := os.Create(filepath.Join(migration.workDir, sourceDeleteFailed))
+		if err != nil {
+			return err
+		}
+		dsFileHandler = f
+		defer dsFileHandler.Close()
+	}
 
 	migrationWorker := NewMigrationWorker(migration.workDir)
 	go migration.DownloadWorker(rootContext, migrationWorker)
@@ -400,6 +412,7 @@ func processUpload(ctx context.Context, downloadObj *DownloadObjectMeta) error {
 		if migration.deleteSource {
 			if err := migration.awsStore.DeleteFile(ctx, downloadObj.ObjectKey); err != nil {
 				zlogger.Logger.Error(err)
+				dsFileHandler.Write([]byte(downloadObj.ObjectKey + "\n"))
 			}
 		}
 		migration.szCtMu.Lock()
