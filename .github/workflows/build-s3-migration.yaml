@@ -45,7 +45,7 @@ jobs:
         run: make build
 
       - name: Zip release
-        run: tar -czvf s3mgrt-linux.tar.gz ./zsmgrt
+        run: tar -czvf s3mgrt-linux.tar.gz ./s3mgrt
 
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
@@ -92,7 +92,7 @@ jobs:
       
       - name: Zip Release
         run: |
-          copy zwallet s3mgrt.exe
+          copy s3mgrt s3mgrt.exe
           7z a s3mgrt-windows.zip s3mgrt.exe
 
       - name: Upload binaries to release
