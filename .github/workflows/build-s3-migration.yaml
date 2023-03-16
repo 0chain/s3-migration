@@ -1,5 +1,9 @@
 name: build-s3-migration
 
+concurrency:
+  group: "publish-${{ github.ref }}"
+  cancel-in-progress: true
+
 on:
   push:
     branches:
@@ -7,6 +11,8 @@ on:
       - staging
     tags:
       - 'v*.*.*'
+  pull_request:
+  workflow_dispatch:
 
 jobs:
   build-linux:
