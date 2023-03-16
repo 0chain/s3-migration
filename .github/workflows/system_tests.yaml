@@ -11,8 +11,8 @@ on:
         description: '0Box CLI branch which the tests will use'
         default: 'staging'
         required: true
-      s3migration_cli_branch:
-        description: 's3-migration cli branch to deploy'
+      zwallet_cli_branch:
+        description: 'zwallet cli branch which the tests will use'
         default: 'staging'
         required: true
       miner_branch:
@@ -51,7 +51,7 @@ jobs:
       miner_branch: ${{ github.event.inputs.miner_branch }}
       sharder_branch: ${{ github.event.inputs.sharder_branch }}
       zbox_cli_branch: ${{ github.event.inputs.zbox_cli_branch }}
-      zwallet_cli_branch: ${{ github.ref_name }}
+      zwallet_cli_branch: ${{ github.event.inputs.zwallet_cli_branch }}
       blobber_branch: ${{ github.event.inputs.blobber_branch }}
       validator_branch: ${{ github.event.inputs.validator_branch }}
       zbox_branch: ${{ github.event.inputs.zbox_branch }}
@@ -59,7 +59,7 @@ jobs:
       zdns_branch: staging
       explorer_branch: staging
       zsearch_branch: staging
-      s3migration_cli_branch: ${{ github.event.inputs.s3migration_cli_branch }}
+      s3migration_cli_branch: ${{ github.ref_name }}
       test_file_filter: ${{ github.event.inputs.test_file_filter }}
       skip_tests: ${{ github.event.inputs.skip_tests }}
     secrets:
