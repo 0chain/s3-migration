@@ -36,7 +36,7 @@ jobs:
           fi
 
       - name: Install
-        run: make install
+        run: make build
 
       - name: Zip release
         run: tar -czvf s3mgrt-linux.tar.gz ./zsmgrt
@@ -82,7 +82,7 @@ jobs:
           }
       
       - name: Install
-        run: make install
+        run: make build
       
       - name: Zip Release
         run: |
@@ -131,7 +131,7 @@ jobs:
           fi
 
       - name: Install
-        run: make install
+        run: make build
       
       - name: Zip release
         run: tar -czvf s3mgrt-macos.tar.gz ./s3mgrt
