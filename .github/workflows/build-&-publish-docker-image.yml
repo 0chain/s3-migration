@@ -64,5 +64,5 @@ jobs:
           SHORT_SHA=$(echo ${{ env.SHA }} | head -c 8)
           export DOCKER_BUILD="buildx build --platform linux/amd64,linux/arm64 --push"
           export DOCKER_IMAGE="-t ${{ secrets.S3MGRT_REGISTRY }}:${TAG} -t ${{ secrets.S3MGRT_REGISTRY }}:${TAG}-${SHORT_SHA}"
-              
+          docker buildx create --driver-opt network=host --use --buildkitd-flags '--allow-insecure-entitlement security.insecure' --use s3mgrt_buildx
           ./docker.local/bin/build.sh
