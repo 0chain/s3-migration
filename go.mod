@@ -15,6 +15,8 @@ require (
 )
 
 require (
+	github.com/0chain/common v0.0.6-0.20221123040931-4a3feacdb97c // indirect
+	github.com/Luzifer/go-openssl/v3 v3.1.0 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.4.9 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.12.23 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.12.19 // indirect
@@ -56,6 +58,7 @@ require (
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.5 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
+	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/spf13/afero v1.9.2 // indirect
 	github.com/spf13/cast v1.5.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
