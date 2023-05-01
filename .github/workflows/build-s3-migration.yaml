@@ -17,7 +17,7 @@ on:
 jobs:
   build-linux:
     name: Build-linux
-    runs-on: [self-hosted, arc-runner]
+    runs-on: [self-hosted, docker-builds]
     steps:
       - name: Setup go 1.18
         uses: actions/setup-go@v2
@@ -26,6 +26,13 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v2
+
+      - name: Get Branch
+        id: get_branch
+        run: |
+            BRANCH=$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//-/g')
+            echo ::set-output name=BRANCH::${BRANCH}
+            echo $BRANCH
 
       - name: Set GITHUB_ENV
         run: |
@@ -43,7 +50,7 @@ jobs:
       - name: add dependencies
         run: |
           sudo apt update -y
-          sudo apt -y install build-essential nghttp2 libnghttp2-dev libssl-dev wget
+          sudo apt -y install build-essential nghttp2 libnghttp2-dev libssl-dev wget unzip
 
       - name: Install
         run: make build
@@ -59,6 +66,26 @@ jobs:
           tag: ${{ env.TAG }}
           overwrite: true
           file_glob: true
+
+      - name: Install AWS
+        if: github.ref == 'refs/heads/staging'
+        run: |
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          sudo ./aws/install
+
+      - name: Set AWS credentials
+        if: github.ref == 'refs/heads/staging'
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.S3_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.S3_SECRET_KEY }}
+          aws-region: us-east-2
+
+      - name: Push to AWS S3
+        if:  github.ref == 'refs/heads/staging'
+        run: |
+          aws s3 cp s3mgrt s3://${{ secrets.S3_MGRT_BINARY_BUCKET }}/s3mgrt
 
       - name: 'Upload Artifact'
         uses: actions/upload-artifact@v2
