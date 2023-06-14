@@ -31,8 +31,20 @@ var (
 	bSilent          bool
 
 	rootCmd = &cobra.Command{
-		Use:   "s3migration",
-		Short: "S3-Migration to migrate s3 buckets to dStorage allocation",
+		Use: "s3migration",
+		Short: "S3-Migration to " +
+			"" +
+			"" +
+			"" +
+			"" +
+			"" +
+			"" +
+			"" +
+			"" +
+			"" +
+			"" +
+			"" +
+			"migrate s3 buckets to dStorage allocation",
 		Long: `S3-Migration uses 0chain-gosdk to communicate with 0chain network. It uses AWS SDK for Go program
 		to communicate with s3.`,
 	}
