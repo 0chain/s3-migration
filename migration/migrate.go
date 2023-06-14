@@ -369,6 +369,79 @@ func checkDownloadStatus(downloadObj *DownloadObjectMeta) error {
 	}
 }
 
+func updateMigration(ctx context.Context, downloadObjSlice []*DownloadObjectMeta) {
+	for _, downloadObj := range downloadObjSlice {
+		if migration.deleteSource {
+			if err := migration.awsStore.DeleteFile(ctx, downloadObj.ObjectKey); err != nil {
+				zlogger.Logger.Error(err)
+				dsFileHandler.Write([]byte(downloadObj.ObjectKey + "\n"))
+			}
+		}
+		migration.szCtMu.Lock()
+		migration.migratedSize += uint64(downloadObj.Size)
+		migration.totalMigratedObjects++
+		migration.szCtMu.Unlock()
+	}
+
+}
+
+func processMultiUpload(ctx context.Context, downloadObjSlice []*DownloadObjectMeta) error {
+	totalOp := len(downloadObjSlice)
+	var multiUploads dStorage.MultiUploadOp
+	multiUploads.Uploads = make([]dStorage.UploadOp, totalOp)
+	for idx, downloadObj := range downloadObjSlice {
+		var uploadOp dStorage.UploadOp
+		remotePath := getRemotePath(downloadObj.ObjectKey)
+
+		fileObj, err := migration.fs.Open(downloadObj.LocalPath)
+		if err != nil {
+			zlogger.Logger.Error(err)
+			return err
+		}
+
+		defer fileObj.Close()
+
+		fileInfo, err := fileObj.Stat()
+		if err != nil {
+			zlogger.Logger.Error(err)
+			return err
+		}
+		mimeType, err := zboxutil.GetFileContentType(fileObj)
+		if err != nil {
+			zlogger.Logger.Error("content type error: ", err, " file: ", fileInfo.Name(), " objKey:", downloadObj.ObjectKey)
+			return err
+		}
+
+		if downloadObj.IsFileAlreadyExist {
+			switch migration.skip {
+			case Replace:
+				uploadOp.IsUpdate = true
+				// zlogger.Logger.Info("Replacing object" + downloadObj.ObjectKey + " size " + strconv.FormatInt(downloadObj.Size, 10))
+				// err = migration.zStore.Replace(ctx, remotePath, fileObj, fileInfo.Size(), mimeType)
+			case Duplicate:
+				uploadOp.IsDuplicate = true
+				// zlogger.Logger.Info("Duplicating object" + downloadObj.ObjectKey + " size " + strconv.FormatInt(downloadObj.Size, 10))
+				// err = migration.zStore.Duplicate(ctx, remotePath, fileObj, fileInfo.Size(), mimeType)
+			}
+		} else {
+			zlogger.Logger.Info("Uploading object: " + downloadObj.ObjectKey + " size " + strconv.FormatInt(downloadObj.Size, 10))
+			err = migration.zStore.Upload(ctx, remotePath, fileObj, fileInfo.Size(), mimeType, false)
+		}
+
+		uploadOp.RemotePath = remotePath
+		uploadOp.FileReader = fileObj
+		uploadOp.ContentType = mimeType
+		uploadOp.Size = fileInfo.Size()
+		multiUploads.Uploads[idx] = uploadOp
+	}
+	err := migration.zStore.MultiUpload(ctx, multiUploads)
+	if err != nil {
+		return err
+	}
+	updateMigration(ctx, downloadObjSlice)
+	return nil
+}
+
 func processUpload(ctx context.Context, downloadObj *DownloadObjectMeta) error {
 	remotePath := getRemotePath(downloadObj.ObjectKey)
 

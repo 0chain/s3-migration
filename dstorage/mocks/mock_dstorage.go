@@ -44,6 +44,7 @@ func (m *MockDStoreI) Duplicate(arg0 context.Context, arg1 string, arg2 io.Reade
 	return ret0
 }
 
+
 // Duplicate indicates an expected call of Duplicate.
 func (mr *MockDStoreIMockRecorder) Duplicate(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()

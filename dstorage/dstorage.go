@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	zlogger "github.com/0chain/s3migration/logger"
@@ -37,6 +38,7 @@ type DStoreI interface {
 	Replace(ctx context.Context, remotePath string, r io.Reader, size int64, contentType string) error
 	Duplicate(ctx context.Context, remotePath string, r io.Reader, size int64, contentType string) error
 	Upload(ctx context.Context, remotePath string, r io.Reader, size int64, contentType string, isUpdate bool) error
+	MultiUpload(ctx context.Context, multiUpload MultiUploadOp) error
 	IsFileExist(ctx context.Context, remotePath string) (bool, error)
 	GetAvailableSpace() int64
 	GetTotalSpace() int64
@@ -54,9 +56,26 @@ type DStorageService struct {
 	workDir         string
 }
 
+type MultiUploadOp struct {
+	Uploads []UploadOp
+}
+type UploadOp struct {
+	RemotePath  string
+	FileReader  io.Reader
+	ContentType string
+	Size        int64
+	Encrypt     bool
+	Thumbnail   string
+	IsUpdate    bool
+	IsDuplicate bool
+	ChunkNumber int
+}
+
 const (
 	GetRefRetryWaitTime = 500 * time.Millisecond
 	GetRefRetryCount    = 2
+	InsertOperation     = "insert"
+	UpdateOperation     = "update"
 )
 
 func (d *DStorageService) GetFileMetaData(ctx context.Context, remotePath string) (*sdk.ORef, error) {
@@ -82,6 +101,46 @@ func (d *DStorageService) GetFileMetaData(ctx context.Context, remotePath string
 	}
 
 	return &oResult.Refs[0], nil
+}
+
+func (d *DStorageService) MultiUpload(ctx context.Context, multiUpload MultiUploadOp) (err error) {
+	totalOp := len(multiUpload.Uploads)
+	wg := &sync.WaitGroup{}
+	operationRequests := make([]sdk.OperationRequest, totalOp)
+	for idx, upload := range multiUpload.Uploads {
+		remotePath := upload.RemotePath
+		if upload.IsDuplicate {
+			remotePath = d.parseRemotepathForDuplicate(remotePath)
+		}
+		fileMeta := sdk.FileMeta{
+			RemotePath: filepath.Clean(remotePath),
+			ActualSize: upload.Size,
+			MimeType:   upload.ContentType,
+			RemoteName: filepath.Base(remotePath),
+		}
+		status := &StatusBar{
+			wg: wg,
+		}
+		options := []sdk.ChunkedUploadOption{
+			sdk.WithEncrypt(upload.Encrypt),
+			sdk.WithStatusCallback(status),
+			sdk.WithChunkNumber(upload.ChunkNumber),
+		}
+		operationRequests[idx] = sdk.OperationRequest{
+			OperationType: InsertOperation,
+			RemotePath:    filepath.Clean(remotePath),
+			FileReader:    upload.FileReader,
+			Workdir:       d.workDir,
+			FileMeta:      fileMeta,
+			Opts:          options,
+		}
+		if upload.IsDuplicate {
+			operationRequests[idx].OperationType = UpdateOperation
+		}
+	}
+	err = d.allocation.DoMultiOperation(operationRequests)
+	return err
+
 }
 
 func (d *DStorageService) Upload(ctx context.Context, remotePath string, r io.Reader, size int64, contentType string, isUpdate bool) (err error) {
@@ -123,7 +182,7 @@ func (d *DStorageService) Replace(ctx context.Context, remotePath string, r io.R
 	return d.Upload(ctx, remotePath, r, size, contentType, true)
 }
 
-func (d *DStorageService) Duplicate(ctx context.Context, remotePath string, r io.Reader, size int64, contentType string) error {
+func (d *DStorageService) parseRemotepathForDuplicate(remotePath string) string {
 	li := strings.LastIndex(remotePath, ".")
 
 	var duplicateSuffix string
@@ -139,7 +198,11 @@ func (d *DStorageService) Duplicate(ctx context.Context, remotePath string, r io
 	} else {
 		remotePath = fmt.Sprintf("%s%s.%s", remotePath[:li], duplicateSuffix, remotePath[li+1:])
 	}
+	return remotePath
+}
+func (d *DStorageService) Duplicate(ctx context.Context, remotePath string, r io.Reader, size int64, contentType string) error {
 
+	remotePath = d.parseRemotepathForDuplicate(remotePath)
 	return d.Upload(ctx, remotePath, r, size, contentType, false)
 }
 
