@@ -58,7 +58,7 @@ type DStorageService struct {
 const (
 	GetRefRetryWaitTime = 500 * time.Millisecond
 	GetRefRetryCount    = 2
-	ChunkNumber         = 1000
+	ChunkNumber         = 100
 )
 
 func (d *DStorageService) GetFileMetaData(ctx context.Context, remotePath string) (*sdk.ORef, error) {

@@ -33,7 +33,7 @@ const (
 )
 
 const (
-	batchSize    = 50
+	batchSize    = 30
 	maxBatchSize = 1024 * 1024 * 1024 // 1GB
 )
 
