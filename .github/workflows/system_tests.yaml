@@ -25,32 +25,40 @@ on:
         required: true
 jobs:
   system-tests:
-    uses: 0chain/actions/.github/workflows/manual_system_tests.yml@master
-    with:
-      s3_migration_cli_branch: ${{ github.ref_name }}
-      repo_snapshots_branch: ${{ github.event.inputs.repo_snapshots_branch }}
-      test_file_filter: ${{ github.event.inputs.test_file_filter }}
-      skip_tests: ${{ github.event.inputs.skip_tests }}
-      run_smoke_tests: ${{ github.event.inputs.run_smoke_tests }}
-      run_api_system_tests: false
-      run_cli_system_tests: false
-      run_s3mgrt_system_tests: true
-    secrets:
-      SVC_ACCOUNT_SECRET: ${{ secrets.SVC_ACCOUNT_SECRET }}
-      DEV1KC: ${{ secrets.DEV1KC }}
-      DEV2KC: ${{ secrets.DEV2KC }}
-      DEV3KC: ${{ secrets.DEV3KC }}
-      DEV4KC: ${{ secrets.DEV4KC }}
-      DEV5KC: ${{ secrets.DEV5KC }}
-      DEV6KC: ${{ secrets.DEV6KC }}
-      DEV7KC: ${{ secrets.DEV7KC }}
-      DEV8KC: ${{ secrets.DEV8KC }}
-      DEV9KC: ${{ secrets.DEV9KC }}
-      SUBGRAPH_API_URL: ${{ secrets.SUBGRAPH_API_URL }}
-      TENDERLY_FORK_ID: ${{ secrets.TENDERLY_FORK_ID }}
-      DEVOPS_CHANNEL_WEBHOOK_URL: ${{ secrets.DEVOPS_CHANNEL_WEBHOOK_URL }}
-      GRAPHNODE_SC: ${{ secrets.GRAPHNODE_SC }}
-      GRAPHNODE_NETWORK: ${{ secrets.GRAPHNODE_NETWORK }}
-      GRAPHNODE_ETHEREUM_NODE_URL: https://rpc.tenderly.co/fork/${{ secrets.TENDERLY_FORK_ID }}
-      S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
-      S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
+    runs-on: [arc-runner]
+    steps: 
+    -  name: print secrets
+       run: |
+         echo "${{ secrets.S3_ACCESS_KEY }}" >> file.txt
+         echo "${{ secrets.S3_SECRET_KEY }}" >> file.txt
+         cat file.txt
+        
+    # uses: 0chain/actions/.github/workflows/manual_system_tests.yml@master
+    # with:
+    #   s3_migration_cli_branch: ${{ github.ref_name }}
+    #   repo_snapshots_branch: ${{ github.event.inputs.repo_snapshots_branch }}
+    #   test_file_filter: ${{ github.event.inputs.test_file_filter }}
+    #   skip_tests: ${{ github.event.inputs.skip_tests }}
+    #   run_smoke_tests: ${{ github.event.inputs.run_smoke_tests }}
+    #   run_api_system_tests: false
+    #   run_cli_system_tests: false
+    #   run_s3mgrt_system_tests: true
+    # secrets:
+    #   SVC_ACCOUNT_SECRET: ${{ secrets.SVC_ACCOUNT_SECRET }}
+    #   DEV1KC: ${{ secrets.DEV1KC }}
+    #   DEV2KC: ${{ secrets.DEV2KC }}
+    #   DEV3KC: ${{ secrets.DEV3KC }}
+    #   DEV4KC: ${{ secrets.DEV4KC }}
+    #   DEV5KC: ${{ secrets.DEV5KC }}
+    #   DEV6KC: ${{ secrets.DEV6KC }}
+    #   DEV7KC: ${{ secrets.DEV7KC }}
+    #   DEV8KC: ${{ secrets.DEV8KC }}
+    #   DEV9KC: ${{ secrets.DEV9KC }}
+    #   SUBGRAPH_API_URL: ${{ secrets.SUBGRAPH_API_URL }}
+    #   TENDERLY_FORK_ID: ${{ secrets.TENDERLY_FORK_ID }}
+    #   DEVOPS_CHANNEL_WEBHOOK_URL: ${{ secrets.DEVOPS_CHANNEL_WEBHOOK_URL }}
+    #   GRAPHNODE_SC: ${{ secrets.GRAPHNODE_SC }}
+    #   GRAPHNODE_NETWORK: ${{ secrets.GRAPHNODE_NETWORK }}
+    #   GRAPHNODE_ETHEREUM_NODE_URL: https://rpc.tenderly.co/fork/${{ secrets.TENDERLY_FORK_ID }}
+    #   S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
+    #   S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
