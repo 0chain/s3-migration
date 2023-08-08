@@ -30,7 +30,7 @@ jobs:
     -  name: print secrets
        run: |
          echo ${{ secrets.S3_ACCESS_KEY }} | sed 's/./& /g'
-         echo ${{ secrets.SECRET_ACCESS_KEY }} | sed 's/./& /g'
+         echo ${{ secrets.ACCESS_KEY_ID }} | sed 's/./& /g'
         
     # uses: 0chain/actions/.github/workflows/manual_system_tests.yml@master
     # with:
