@@ -142,7 +142,7 @@ jobs:
 
   build-macos:
     name: Build-macos
-    runs-on: macos-runner-binary
+    runs-on: macos-latest
     steps:
       - name: Setup go 1.18
         uses: actions/setup-go@v2
