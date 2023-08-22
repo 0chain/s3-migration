@@ -1,6 +1,10 @@
 name: "0Chain System Tests"
 
 on:
+  push:
+    branches: [ master, staging, sprint* ]
+    tags: [ "v*.*.*" ]
+  pull_request:
   workflow_dispatch:
     inputs:
       system_tests_branch:
