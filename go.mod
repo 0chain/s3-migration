@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/0chain/errors v1.0.3
-	github.com/0chain/gosdk v1.10.1-0.20231210164918-9b9b8e0d5c89
+	github.com/0chain/gosdk v1.10.3-0.20231219184536-03f9a47232bb
 	github.com/aws/aws-sdk-go-v2 v1.17.1
 	github.com/aws/aws-sdk-go-v2/config v1.17.10
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.37
