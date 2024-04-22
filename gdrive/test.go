@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	driveAccessToken=""
-	testFileID=""
+	driveAccessToken = ""
+	testFileID       = ""
 )
 
 // using: https://developers.google.com/oauthplayground
@@ -47,14 +47,18 @@ func TestGoogleDriveClient_ListFiles(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	files, err := client.ListFiles(ctx)
-	if err != nil {
-		zlogger.Logger.Error(fmt.Sprintf("err while list files: %v", err))
-		return
-	}
+	objectChan, errChan := client.ListFiles(ctx)
 
-	for _, file := range files {
-		zlogger.Logger.Info(fmt.Sprintf("file: %s, name: %s, size: %d bytes", file.ID, file.Name, file.Size))
+	// Handle errors asynchronously
+	go func() {
+		for err := range errChan {
+			zlogger.Logger.Error(fmt.Sprintf("err while list files: %v", err))
+		}
+	}()
+
+	// Receive ObjectMeta objects asynchronously
+	for object := range objectChan {
+		zlogger.Logger.Info(fmt.Sprintf("file:%s, size: %d bytes, type: %s", object.Key, object.Size, object.ContentType))
 	}
 }
 
@@ -67,7 +71,7 @@ func TestGoogleDriveClient_GetFileContent(t *testing.T) {
 
 	ctx := context.Background()
 	fileID := testFileID
-	obj, err := client.GetFileContent(ctx, fileID, true)
+	obj, err := client.GetFileContent(ctx, fileID)
 
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("err while getting file content: %v", err))

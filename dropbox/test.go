@@ -10,7 +10,7 @@ import (
 
 var (
 	dropboxAccessToken = ""
-	testFilePath = ""
+	testFilePath       = ""
 )
 
 const TestFileContent = ` by Manuel Gutiérrez Nájera
@@ -44,14 +44,16 @@ func TestDropboxClient_ListFiles(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	files, err := client.ListFiles(ctx)
-	if err != nil {
-		zlogger.Logger.Error(fmt.Sprintf("Error while listing files: %v", err))
-		return
-	}
+	objectChan, errChan := client.ListFiles(ctx)
 
-	for _, file := range files {
-		zlogger.Logger.Info(fmt.Sprintf("File: %s, Name: %s, Size: %d bytes", file.Path, file.ContentType, file.Size))
+	go func() {
+		for err := range errChan {
+			zlogger.Logger.Error(fmt.Sprintf("Error while listing files: %v", err))
+		}
+	}()
+
+	for object := range objectChan {
+		zlogger.Logger.Info(fmt.Sprintf("Key: %s, Type: %s, Size: %d bytes", object.Key, object.ContentType, object.Size))
 	}
 }
 
