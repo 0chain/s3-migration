@@ -13,8 +13,7 @@ import (
 )
 
 type DropboxI interface {
-    ListFiles(ctx context.Context) ([]*ObjectMeta, error)
-    ListFilesInFolder(ctx context.Context, folderName string) ([]*ObjectMeta, error)
+	ListFiles(ctx context.Context) (<-chan *ObjectMeta, <-chan error)
 	GetFileContent(ctx context.Context, filePath string) (*Object, error)
 	DeleteFile(ctx context.Context, filePath string) error
 	DownloadToFile(ctx context.Context, filePath string) (string, error)
@@ -24,13 +23,12 @@ type DropboxI interface {
 type Object struct {
 	Body          io.ReadCloser
 	ContentType   string
-	ContentLength uint64
+	ContentLength int64
 }
 
 type ObjectMeta struct {
-	Name        string
-	Path        string
-	Size        uint64
+	Key         string
+	Size        int64
 	ContentType string
 }
 
@@ -54,62 +52,35 @@ func GetDropboxClient(token string) (*DropboxClient, error) {
 	}, nil
 }
 
-func (d *DropboxClient) ListFiles(ctx context.Context) ([]*ObjectMeta, error) {
-	var objects []*ObjectMeta
+func (d *DropboxClient) ListFiles(ctx context.Context) (<-chan *ObjectMeta, <-chan error) {
+	objectChan := make(chan *ObjectMeta)
+	errChan := make(chan error)
 
-	arg := files.NewListFolderArg("")
-	arg.Recursive = true
+	go func() {
+		defer close(objectChan)
+		defer close(errChan)
 
-	res, err := d.dropboxFiles.ListFolder(arg)
+		arg := files.NewListFolderArg("")
+		arg.Recursive = true
 
-	if err != nil {
-		return nil, err
-	}
-
-	for _, entry := range res.Entries {
-
-		if meta, ok := entry.(*files.FileMetadata); ok {
-
-			objects = append(objects, &ObjectMeta{
-				Name:        meta.Name,
-				Path:        meta.PathDisplay,
-				Size:        meta.Size,
-				ContentType: mime.TypeByExtension(filepath.Ext(meta.PathDisplay)),
-			})
-
+		res, err := d.dropboxFiles.ListFolder(arg)
+		if err != nil {
+			errChan <- err
+			return
 		}
-	}
 
-	return objects, nil
-}
-
-func (d *DropboxClient) ListFilesInFolder(ctx context.Context, folderName string) ([]*ObjectMeta, error) {
-	var objects []*ObjectMeta
-
-	arg := files.NewListFolderArg(folderName)
-	arg.Recursive = true
-
-	res, err := d.dropboxFiles.ListFolder(arg)
-
-	if err != nil {
-		return nil, err
-	}
-
-	for _, entry := range res.Entries {
-
-		if meta, ok := entry.(*files.FileMetadata); ok {
-
-			objects = append(objects, &ObjectMeta{
-				Name:        meta.Name,
-				Path:        meta.PathDisplay,
-				Size:        meta.Size,
-				ContentType: mime.TypeByExtension(filepath.Ext(meta.PathDisplay)),
-			})
-
+		for _, entry := range res.Entries {
+			if meta, ok := entry.(*files.FileMetadata); ok {
+				objectChan <- &ObjectMeta{
+					Key:         meta.PathDisplay,
+					Size:        int64(meta.Size),
+					ContentType: mime.TypeByExtension(filepath.Ext(meta.PathDisplay)),
+				}
+			}
 		}
-	}
+	}()
 
-	return objects, nil
+	return objectChan, errChan
 }
 
 func (d *DropboxClient) GetFileContent(ctx context.Context, filePath string) (*Object, error) {
@@ -122,7 +93,7 @@ func (d *DropboxClient) GetFileContent(ctx context.Context, filePath string) (*O
 	return &Object{
 		Body:          content,
 		ContentType:   mime.TypeByExtension(filepath.Ext(filePath)),
-		ContentLength: res.Size,
+		ContentLength: int64(res.Size),
 	}, nil
 }
 
@@ -156,33 +127,33 @@ func (d *DropboxClient) DownloadToFile(ctx context.Context, filePath string) (st
 }
 
 func (d *DropboxClient) DownloadToMemory(ctx context.Context, objectKey string, offset int64, chunkSize, objectSize int64) ([]byte, error) {
-    limit := offset + chunkSize - 1
-    if limit > objectSize {
-        limit = objectSize
-    }
+	limit := offset + chunkSize - 1
+	if limit > objectSize {
+		limit = objectSize
+	}
 
-    rng := fmt.Sprintf("bytes=%d-%d", offset, limit)
+	rng := fmt.Sprintf("bytes=%d-%d", offset, limit)
 
-    arg := files.NewDownloadArg(objectKey)
+	arg := files.NewDownloadArg(objectKey)
 
-    arg.ExtraHeaders = map[string]string{"Range": rng}
+	arg.ExtraHeaders = map[string]string{"Range": rng}
 
-    _, content, err := d.dropboxFiles.Download(arg)
-    if err != nil {
-        return nil, err
-    }
-    defer content.Close()
+	_, content, err := d.dropboxFiles.Download(arg)
+	if err != nil {
+		return nil, err
+	}
+	defer content.Close()
 
-    data := make([]byte, chunkSize)
-    n, err := io.ReadFull(content, data)
+	data := make([]byte, chunkSize)
+	n, err := io.ReadFull(content, data)
 
-    if err != nil && err != io.ErrUnexpectedEOF {
-        return nil, err
-    }
+	if err != nil && err != io.ErrUnexpectedEOF {
+		return nil, err
+	}
 
-    if int64(n) < chunkSize && objectSize != chunkSize {
-        data = data[:n]
-    }
+	if int64(n) < chunkSize && objectSize != chunkSize {
+		data = data[:n]
+	}
 
-    return data, nil
+	return data, nil
 }
