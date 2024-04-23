@@ -16,6 +16,7 @@ import (
 	"github.com/0chain/gosdk/zboxcore/sdk"
 	"github.com/0chain/gosdk/zboxcore/zboxutil"
 	dStorage "github.com/0chain/s3migration/dstorage"
+	"github.com/0chain/s3migration/header"
 	zlogger "github.com/0chain/s3migration/logger"
 	"github.com/0chain/s3migration/s3"
 	"github.com/0chain/s3migration/util"
@@ -57,9 +58,9 @@ func abandonAllOperations(err error) {
 }
 
 type Migration struct {
-	zStore   dStorage.DStoreI
-	awsStore s3.AwsI
-	fs       util.FileSystem
+	zStore    dStorage.DStoreI
+	dataStore header.CloudStorageI
+	fs        util.FileSystem
 
 	skip       int
 	retryCount int
@@ -118,7 +119,9 @@ func InitMigration(mConfig *MigrationConfig) error {
 		return err
 	}
 	mConfig.ChunkSize = int64(mConfig.ChunkNumber) * dStorageService.GetChunkWriteSize()
-	zlogger.Logger.Info("Getting aws storage service")
+	zlogger.Logger.Info("Getting Cloud storage service")
+
+	println("mconfig", mConfig)
 	awsStorageService, err := s3.GetAwsClient(
 		mConfig.Bucket,
 		mConfig.Prefix,
@@ -136,7 +139,7 @@ func InitMigration(mConfig *MigrationConfig) error {
 
 	migration = Migration{
 		zStore:        dStorageService,
-		awsStore:      awsStorageService,
+		dataStore:     awsStorageService,
 		skip:          mConfig.Skip,
 		concurrency:   mConfig.Concurrency,
 		retryCount:    mConfig.RetryCount,
@@ -246,7 +249,7 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 	totalObjChan := make(chan struct{}, 100)
 	defer close(totalObjChan)
 	go updateTotalObjects(totalObjChan, m.workDir)
-	objCh, errCh := migration.awsStore.ListFilesInBucket(rootContext)
+	objCh, errCh := migration.dataStore.ListFiles(rootContext)
 	wg := &sync.WaitGroup{}
 	ops := make([]MigrationOperation, 0, m.batchSize)
 	var opLock sync.Mutex
@@ -553,7 +556,7 @@ func (m *Migration) processMultiOperation(ctx context.Context, ops []MigrationOp
 	defer func() {
 		for _, op := range ops {
 			if migration.deleteSource && err == nil {
-				if deleteErr := migration.awsStore.DeleteFile(ctx, op.uploadObj.ObjectKey); deleteErr != nil {
+				if deleteErr := migration.dataStore.DeleteFile(ctx, op.uploadObj.ObjectKey); deleteErr != nil {
 					zlogger.Logger.Error(deleteErr)
 					dsFileHandler.Write([]byte(op.uploadObj.ObjectKey + "\n"))
 				}
@@ -609,7 +612,7 @@ func (m *Migration) processChunkDownload(ctx context.Context, sw *util.StreamWri
 			return
 		default:
 		}
-		data, err := m.awsStore.DownloadToMemory(ctx, downloadObjMeta.ObjectKey, int64(offset), int64(chunkSize), downloadObjMeta.Size)
+		data, err := m.dataStore.DownloadToMemory(ctx, downloadObjMeta.ObjectKey, int64(offset), int64(chunkSize), downloadObjMeta.Size)
 		if err != nil {
 			migrator.DownloadDone(downloadObjMeta, "", err)
 			ctx.Err()

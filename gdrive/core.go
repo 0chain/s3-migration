@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/0chain/s3migration/header"
 	zlogger "github.com/0chain/s3migration/logger"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/drive/v3"
@@ -14,11 +15,7 @@ import (
 )
 
 type GoogleDriveI interface {
-	ListFiles(ctx context.Context) (<-chan *ObjectMeta, <-chan error)
-	GetFileContent(ctx context.Context, fileID string) (*Object, error)
-	DeleteFile(ctx context.Context, fileID string) error
-	DownloadToFile(ctx context.Context, fileID, destinationPath string) error
-	DownloadToMemory(ctx context.Context, fileID string, offset int64, chunkSize, fileSize int64) ([]byte, error)
+	header.CloudStorageI
 }
 
 type Object struct {

@@ -21,12 +21,12 @@ func TestMigrate(t *testing.T) {
 	dStorageService := mock_dstorage.NewMockDStoreI(ctrl)
 	awsStorageService := mock_s3.NewMockAwsI(ctrl)
 	fileSystem := mock_util.NewMockFileSystem(ctrl)
-	migration = Migration{
-		zStore:   dStorageService,
-		awsStore: awsStorageService,
-		skip:     Skip,
-		fs:       fileSystem,
-	}
+	// migration = Migration{
+	// 	zStore:   dStorageService,
+	// 	awsStore: awsStorageService,
+	// 	skip:     Skip,
+	// 	fs:       fileSystem,
+	// }
 
 	tests := []struct {
 		name             string
@@ -56,7 +56,7 @@ func TestMigrate(t *testing.T) {
 
 				errChan := make(chan error, 1)
 				close(errChan)
-				awsStorageService.EXPECT().ListFilesInBucket(gomock.Any()).Return(fileListChan, errChan)
+				awsStorageService.EXPECT().ListFiles(gomock.Any()).Return(fileListChan, errChan)
 
 				awsStorageService.EXPECT().DownloadToFile(gomock.Any(), "file1").Return("/aws/file1", nil)
 				awsStorageService.EXPECT().DownloadToFile(gomock.Any(), "file2").Return("/aws/file2", nil)
@@ -115,7 +115,7 @@ func TestMigrate(t *testing.T) {
 
 				errChan := make(chan error, 1)
 				close(errChan)
-				awsStorageService.EXPECT().ListFilesInBucket(gomock.Any()).Return(fileListChan, errChan)
+				awsStorageService.EXPECT().ListFiles(gomock.Any()).Return(fileListChan, errChan)
 
 				updateKeyFunc = func(statePath string) (func(stateKey string), func(), error) {
 					return func(stateKey string) {}, func() {}, nil
@@ -141,7 +141,7 @@ func TestMigrate(t *testing.T) {
 
 				errChan := make(chan error, 1)
 				close(errChan)
-				awsStorageService.EXPECT().ListFilesInBucket(gomock.Any()).Return(fileListChan, errChan)
+				awsStorageService.EXPECT().ListFiles(gomock.Any()).Return(fileListChan, errChan)
 
 				updateKeyFunc = func(statePath string) (func(stateKey string), func(), error) {
 					return func(stateKey string) {}, func() {}, nil
@@ -178,7 +178,7 @@ func TestMigrate(t *testing.T) {
 				errChan := make(chan error, 1)
 				errChan <- errors.New("some error")
 
-				awsStorageService.EXPECT().ListFilesInBucket(gomock.Any()).Return(fileListChan, errChan)
+				awsStorageService.EXPECT().ListFiles(gomock.Any()).Return(fileListChan, errChan)
 
 				updateKeyFunc = func(statePath string) (func(stateKey string), func(), error) {
 					return func(stateKey string) {}, func() {}, nil

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/0chain/gosdk/core/encryption"
+	"github.com/0chain/s3migration/header"
 	zlogger "github.com/0chain/s3migration/logger"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
@@ -19,11 +20,7 @@ import (
 
 //go:generate mockgen -destination mocks/mock_aws.go -package mock_s3 github.com/0chain/s3migration/s3 AwsI
 type AwsI interface {
-	ListFilesInBucket(ctx context.Context) (<-chan *ObjectMeta, <-chan error)
-	GetFileContent(ctx context.Context, objectKey string) (*Object, error)
-	DeleteFile(ctx context.Context, objectKey string) error
-	DownloadToFile(ctx context.Context, objectKey string) (string, error)
-	DownloadToMemory(ctx context.Context, objectKey string, offset int64, chunkSize, objectSize int64) ([]byte, error)
+	header.CloudStorageI
 }
 
 type Object struct {
@@ -136,8 +133,8 @@ func (a *AwsClient) getBucketRegion() (region string, err error) {
 	return
 }
 
-func (a *AwsClient) ListFilesInBucket(ctx context.Context) (<-chan *ObjectMeta, <-chan error) {
-	objectMetaChan := make(chan *ObjectMeta, 1000)
+func (a *AwsClient) ListFiles(ctx context.Context) (<-chan *header.ObjectMeta, <-chan error) {
+	objectMetaChan := make(chan *header.ObjectMeta, 1000)
 	errChan := make(chan error, 1)
 
 	go func() {
@@ -192,20 +189,20 @@ func (a *AwsClient) ListFilesInBucket(ctx context.Context) (<-chan *ObjectMeta, 
 					errChan <- err
 					return
 				}
-				objectMetaChan <- &ObjectMeta{Key: aws.ToString(obj.Key), Size: obj.Size, ContentType: contentType}
+				objectMetaChan <- &header.ObjectMeta{Key: aws.ToString(obj.Key), Size: obj.Size, ContentType: contentType}
 			}
 		}
 	}()
 	return objectMetaChan, errChan
 }
 
-func (a *AwsClient) GetFileContent(ctx context.Context, objectKey string) (*Object, error) {
+func (a *AwsClient) GetFileContent(ctx context.Context, objectKey string) (*header.Object, error) {
 	out, err := a.client.GetObject(ctx, &awsS3.GetObjectInput{Bucket: aws.String(a.bucket), Key: aws.String(objectKey)})
 	if err != nil {
 		return nil, err
 	}
 
-	return &Object{
+	return &header.Object{
 		Body:          out.Body,
 		ContentType:   aws.ToString(out.ContentType),
 		ContentLength: out.ContentLength,

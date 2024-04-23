@@ -8,16 +8,13 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/0chain/s3migration/header"
 	"github.com/dropbox/dropbox-sdk-go-unofficial/v6/dropbox"
 	"github.com/dropbox/dropbox-sdk-go-unofficial/v6/dropbox/files"
 )
 
 type DropboxI interface {
-	ListFiles(ctx context.Context) (<-chan *ObjectMeta, <-chan error)
-	GetFileContent(ctx context.Context, filePath string) (*Object, error)
-	DeleteFile(ctx context.Context, filePath string) error
-	DownloadToFile(ctx context.Context, filePath string) (string, error)
-	DownloadToMemory(ctx context.Context, objectKey string, offset int64, chunkSize, objectSize int64) ([]byte, error)
+	header.CloudStorageI
 }
 
 type Object struct {

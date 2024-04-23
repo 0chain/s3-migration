@@ -1,6 +1,8 @@
 package migration
 
-import "time"
+import (
+	"time"
+)
 
 type MigrationConfig struct {
 	AllocationID    string
@@ -22,4 +24,6 @@ type MigrationConfig struct {
 	ChunkSize       int64
 	ChunkNumber     int
 	BatchSize       int
+	cloud           string
+	filepath        string
 }
