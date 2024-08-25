@@ -20,7 +20,7 @@ jobs:
       - name: Setup go 1.20
         uses: actions/setup-go@v3
         with:
-          go-version: '1.20' # The Go version to download (if necessary) and use.
+          go-version: '1.22' # The Go version to download (if necessary) and use.
 
       - name: Checkout
         uses: actions/checkout@v2
@@ -52,7 +52,7 @@ jobs:
 
       - name: Install
         run: |
-          docker run --rm -v $PWD:/s3mgrt --workdir=/s3mgrt golang:1.20.4 make build
+          docker run --rm -v $PWD:/s3mgrt --workdir=/s3mgrt golang:1.22.5 make build
 
       # - name: Zip release
       #   run: tar -czvf s3mgrt-linux.tar.gz ./s3mgrt
