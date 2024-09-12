@@ -632,5 +632,6 @@ func (m *Migration) processChunkDownload(ctx context.Context, sw *util.StreamWri
 			break
 		}
 	}
+	// dummy comment
 	migrator.DownloadDone(downloadObjMeta, "", nil)
 }
