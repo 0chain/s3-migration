@@ -6,7 +6,7 @@ toolchain go1.22.2
 
 require (
 	github.com/0chain/errors v1.0.3
-	github.com/0chain/gosdk v1.17.0-RC4.0.20240824190709-96c7a58bb85c
+	github.com/0chain/gosdk v1.17.7-0.20240914203956-2d0ff4ffa035
 	github.com/aws/aws-sdk-go-v2 v1.17.1
 	github.com/aws/aws-sdk-go-v2/config v1.17.10
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.37
@@ -102,5 +102,3 @@ require (
 )
 
 replace github.com/herumi/bls-go-binary => github.com/boddumanohar/bls-go-binary v1.30.8
-
-replace github.com/0chain/gosdk => ../gosdk
