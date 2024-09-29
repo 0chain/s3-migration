@@ -129,9 +129,9 @@ var migrateCmd = &cobra.Command{
 			}
 		}
 
-		if accessToken == "" {
+		if accessToken == "" && (source=="google_drive" || source =="dropbox") {
 			if accessToken = util.GetAccessToken(); accessToken == "" {
-				return errors.New("Missing Access Token")
+				return errors.New("missing access token")
 			}
 		}
 		if bucket == "" && source == "s3" {
