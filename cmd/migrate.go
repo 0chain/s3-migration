@@ -41,7 +41,6 @@ var (
 	chunkNumber                int
 	batchSize                  int
 	source                     string
-	accessToken                string // if source is google drive or dropbox
 )
 
 // migrateCmd is the migrateFromS3 sub command to migrate whole objects from some buckets.
@@ -52,8 +51,8 @@ func init() {
 	migrateCmd.PersistentFlags().StringVar(&allocationId, "allocation", "", "allocation ID for dStorage")
 	migrateCmd.Flags().StringVar(&allocationTextPath, "alloc-path", "", "File Path to allocation text")
 	migrateCmd.Flags().BoolVar(&encrypt, "encrypt", false, "pass this option to encrypt and upload the file")
-	//flags related to s3
-	migrateCmd.PersistentFlags().StringVar(&accessKey, "access-key", "", "access-key of aws")
+	//flags related to cloudstorage
+	migrateCmd.PersistentFlags().StringVar(&accessKey, "access-key", "", "access-key of CloudStorage [Aws, Drive, Dropbox]")
 	migrateCmd.PersistentFlags().StringVar(&secretKey, "secret-key", "", "secret-key of aws")
 	migrateCmd.Flags().StringVar(&awsCredPath, "aws-cred-path", "", "File Path to aws credentials")
 	migrateCmd.PersistentFlags().StringVar(&bucket, "bucket", "", "Bucket to migrate")
@@ -74,7 +73,6 @@ func init() {
 	migrateCmd.Flags().IntVar(&chunkNumber, "chunk-number", 250, "number of chunks to upload")
 	migrateCmd.Flags().IntVar(&batchSize, "batch-size", 20, "number of files to upload in a batch")
 	migrateCmd.Flags().StringVar(&source, "source", "s3", "s3 or google_drive or dropbox")
-	migrateCmd.Flags().StringVar(&accessToken, "access-token", "", "access token for google drive or dropbox")
 }
 
 var migrateCmd = &cobra.Command{
@@ -128,13 +126,6 @@ var migrateCmd = &cobra.Command{
 				}
 			}
 		}
-
-		if accessToken == "" && (source=="google_drive" || source =="dropbox") {
-			if accessToken = util.GetAccessToken(); accessToken == "" {
-				return errors.New("missing access token")
-			}
-		}
-		
 		if bucket == "" && source == "s3" {
 			bucket, region, prefix, err = util.GetBucketRegionPrefixFromFile(awsCredPath)
 			if err != nil {
@@ -210,7 +201,6 @@ var migrateCmd = &cobra.Command{
 				startAfter = strings.ReplaceAll(strings.ReplaceAll(startAfter, " ", ""), "\n", "")
 			}
 		}
-
 		if err := util.SetAwsEnvCredentials(accessKey, secretKey); err != nil {
 			return err
 		}
@@ -245,9 +235,7 @@ var migrateCmd = &cobra.Command{
 			ChunkSize:       chunkSize,
 			ChunkNumber:     chunkNumber,
 			BatchSize:       batchSize,
-
 			Source:      source,
-			AccessToken: accessToken,
 		}
 
 		if err := migration.InitMigration(&mConfig); err != nil {
