@@ -139,12 +139,12 @@ func InitMigration(mConfig *MigrationConfig) error {
 		)
 	} else if mConfig.Source == "dropbox" {
 		dataSourceStore, err = dropbox.GetDropboxClient(
-			mConfig.AccessToken,
+			util.GetAccessKeyFromEnv(),
 			mConfig.WorkDir,
 		)
 	} else if mConfig.Source == "google_drive" {
 		dataSourceStore, err = gdrive.NewGoogleDriveClient(
-			mConfig.AccessToken,
+			util.GetAccessKeyFromEnv(),
 			mConfig.WorkDir,
 		)
 	} else {
