@@ -143,7 +143,13 @@ func (g *GoogleDriveClient) DownloadToFile(ctx context.Context, fileID string) (
 	}
 	defer resp.Body.Close()
 
-	destinationPath := path.Join(g.workDir, fileID)
+	file, err := g.service.Files.Get(fileID).Fields("name").Do()
+	if err != nil {
+		return "", err
+	}
+
+	zlogger.Logger.Info(fmt.Sprintf("Original File Name: %s", file.Name))
+	destinationPath := path.Join(g.workDir, file.Name )
 
 	out, err := os.Create(destinationPath)
 	if err != nil {
