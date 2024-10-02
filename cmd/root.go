@@ -87,14 +87,13 @@ func initConfig() {
 	zlogger.SetLogFile("s3migration.log", !bSilent)
 
 	err = client.Init(context.Background(), conf.Config{
-		ChainID:           cfg.ChainID,
-		BlockWorker:       cfg.BlockWorker,
-		SignatureScheme:   cfg.SignatureScheme,
-		PreferredBlobbers: nil,
-		MaxTxnQuery:       5,
-		QuerySleepTime:    5,
-		MinSubmit:         10,
-		MinConfirmation:   10,
+		ChainID:         cfg.ChainID,
+		BlockWorker:     cfg.BlockWorker,
+		SignatureScheme: cfg.SignatureScheme,
+		MaxTxnQuery:     5,
+		QuerySleepTime:  5,
+		MinSubmit:       10,
+		MinConfirmation: 10,
 	})
 	if err != nil {
 		panic(err)
@@ -151,7 +150,7 @@ func initConfig() {
 	}
 
 	//init the storage sdk with the known miners, sharders and client wallet info
-	if err := client.InitSDK(clientConfig, cfg.BlockWorker, cfg.ChainID, cfg.SignatureScheme, cfg.PreferredBlobbers, nonce, false, true); err != nil {
+	if err := client.InitSDK(clientConfig, cfg.BlockWorker, cfg.ChainID, cfg.SignatureScheme, nonce, false, true); err != nil {
 		panic(err)
 	}
 

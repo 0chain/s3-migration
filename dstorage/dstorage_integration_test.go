@@ -107,7 +107,7 @@ func initDStorageSDK() {
 		os.Exit(1)
 	}
 
-	if err := client.InitSDK(clientConfig, cfg.BlockWorker, cfg.ChainID, cfg.SignatureScheme, cfg.PreferredBlobbers, 0, false, true); err != nil {
+	if err := client.InitSDK(clientConfig, cfg.BlockWorker, cfg.ChainID, cfg.SignatureScheme, 0, false, true); err != nil {
 		panic(err)
 	}
 
