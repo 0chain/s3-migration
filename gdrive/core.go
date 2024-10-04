@@ -20,12 +20,9 @@ type GoogleDriveClient struct {
 	workDir string
 }
 
-func NewGoogleDriveClient(accessToken string, workDir string) (*GoogleDriveClient, error) {
+func NewGoogleDriveClient(cfg oauth2.Config, token *oauth2.Token, workDir string) (*GoogleDriveClient, error) {
 	ctx := context.Background()
-
-	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: accessToken})
-
-	httpClient := oauth2.NewClient(ctx, tokenSource)
+	httpClient := cfg.Client(ctx, token)
 
 	service, err := drive.NewService(ctx, option.WithHTTPClient(httpClient))
 	if err != nil {
@@ -143,7 +140,13 @@ func (g *GoogleDriveClient) DownloadToFile(ctx context.Context, fileID string) (
 	}
 	defer resp.Body.Close()
 
-	destinationPath := path.Join(g.workDir, fileID)
+	file, err := g.service.Files.Get(fileID).Fields("name").Do()
+	if err != nil {
+		return "", err
+	}
+
+	zlogger.Logger.Info(fmt.Sprintf("Original File Name: %s", file.Name))
+	destinationPath := path.Join(g.workDir, file.Name )
 
 	out, err := os.Create(destinationPath)
 	if err != nil {

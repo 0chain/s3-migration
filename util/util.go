@@ -59,6 +59,15 @@ func SetAwsEnvCredentials(accessKey, secretKey string) (err error) {
 	return os.Setenv("AWS_SECRET_ACCESS_KEY", secretKey)
 }
 
+
+func SetClientCredentials(clientId, clientSecret string) (err error) {
+	err = os.Setenv("CLIENT_ID", clientId)
+	if err != nil {
+		return
+	}
+	return os.Setenv("CLIENT_SECRET", clientSecret)
+}
+
 func GetAwsCredentialsFromFile(credPath string) (accessKey, secretKey string) {
 	f, err := os.Open(credPath)
 	if err != nil {
@@ -103,8 +112,16 @@ func GetAwsCredentialsFromEnv() (string, string) {
 	return os.Getenv("AWS_ACCESS_KEY"), os.Getenv("AWS_SECRET_KEY")
 }
 
+func GetClientCredentialsFromEnv() (string, string) {
+	return os.Getenv("CLIENT_ID"), os.Getenv("CLIENT_SECRET")
+}
+
 func GetAccessKeyFromEnv() (string) {
 	return os.Getenv("AWS_ACCESS_KEY_ID")
+}
+
+func GetRefreshKeyFromEnv() (string) {
+	return os.Getenv("AWS_SECRET_ACCESS_KEY")
 }
 
 func ConvertGoSDKTimeToTime(in string) time.Time {

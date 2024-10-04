@@ -6,11 +6,15 @@ import (
 	"testing"
 
 	zlogger "github.com/0chain/s3migration/logger"
+	"golang.org/x/oauth2"
 )
 
 var (
-	driveAccessToken = "ya29.a0Ad52N384rCQyODIBhljd7yg4RmP8czIUmIbJGkFHXNn-TnuEt3RL3ykzp0lEekSEoU0GDCkMnow31XOWFt0Dlw2l89fnO5sS8aiZKW8y0dDhqE6jtsNqpnA38EN5tBlRkNo0ipyY0Ps-cgX4hNxRRQcWhTZEqZgnOyLuaCgYKAWESARESFQHGX2Mi6ejaNEiKSZP6_H3hoXkeNA0171"
-	testFileID       = ""
+	driveAccessToken="";
+	driveRefreshToken="";
+	clientId = "";
+	testFileID="";
+	clientSecret="";
 )
 
 // using: https://developers.google.com/oauthplayground
@@ -39,8 +43,28 @@ while life still says: "I'm yours"
 though we know with our hearts that she lies. 
 `
 
+func getOAuthConfig() (*oauth2.Config, *oauth2.Token) {
+	cfg := &oauth2.Config{
+		ClientID:     clientId,
+		ClientSecret: clientSecret,
+		Endpoint: oauth2.Endpoint{
+			AuthURL:       "https://accounts.google.com/o/oauth2/auth",
+			DeviceAuthURL: "https://oauth2.googleapis.com/device/code",
+			TokenURL:      "https://oauth2.googleapis.com/token",
+		},
+	}
+
+	token := &oauth2.Token{
+		AccessToken:  driveAccessToken,
+		RefreshToken: driveRefreshToken,
+	}
+
+	return cfg, token
+}
+
 func TestGoogleDriveClient_ListFiles(t *testing.T) {
-	client, err := NewGoogleDriveClient(driveAccessToken, "./")
+	cfg, token := getOAuthConfig()
+	client, err := NewGoogleDriveClient(*cfg, token, "./")
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("err while creating Google Drive client: %v", err))
 		return
@@ -61,7 +85,8 @@ func TestGoogleDriveClient_ListFiles(t *testing.T) {
 }
 
 func TestGoogleDriveClient_GetFileContent(t *testing.T) {
-	client, err := NewGoogleDriveClient(driveAccessToken, "./")
+	cfg, token := getOAuthConfig()
+	client, err := NewGoogleDriveClient(*cfg, token, "./")
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("Failed to creating Google Drive client: %v", err))
 		return
@@ -95,7 +120,8 @@ func TestGoogleDriveClient_GetFileContent(t *testing.T) {
 }
 
 func TestGoogleDriveClient_DeleteFile(t *testing.T) {
-	client, err := NewGoogleDriveClient(driveAccessToken, "./")
+	cfg, token := getOAuthConfig()
+	client, err := NewGoogleDriveClient(*cfg, token, "./")
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("err while creating Google Drive client: %v", err))
 		return
@@ -112,7 +138,8 @@ func TestGoogleDriveClient_DeleteFile(t *testing.T) {
 }
 
 func TestGoogleDriveClient_DownloadToFile(t *testing.T) {
-	client, err := NewGoogleDriveClient(driveAccessToken, "./")
+	cfg, token := getOAuthConfig()
+	client, err := NewGoogleDriveClient(*cfg, token, "./")
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("err while creating Google Drive client: %v", err))
 	}
@@ -128,7 +155,8 @@ func TestGoogleDriveClient_DownloadToFile(t *testing.T) {
 }
 
 func TestGoogleDriveClient_DownloadToMemory(t *testing.T) {
-	client, err := NewGoogleDriveClient(driveAccessToken, "./")
+	cfg, token := getOAuthConfig()
+	client, err := NewGoogleDriveClient(*cfg, token, "./")
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("err while creating Google Drive client: %v", err))
 	}

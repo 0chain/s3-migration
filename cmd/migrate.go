@@ -41,6 +41,8 @@ var (
 	chunkNumber                int
 	batchSize                  int
 	source                     string
+	clientId				   string
+	clientSecret 			   string
 )
 
 // migrateCmd is the migrateFromS3 sub command to migrate whole objects from some buckets.
@@ -73,6 +75,8 @@ func init() {
 	migrateCmd.Flags().IntVar(&chunkNumber, "chunk-number", 250, "number of chunks to upload")
 	migrateCmd.Flags().IntVar(&batchSize, "batch-size", 20, "number of files to upload in a batch")
 	migrateCmd.Flags().StringVar(&source, "source", "s3", "s3 or google_drive or dropbox")
+	migrateCmd.Flags().StringVar(&clientId, "client-id", "", "Client id for Google app console")
+	migrateCmd.Flags().StringVar(&clientSecret, "client-secret", "", "Client secret for Google app console")
 }
 
 var migrateCmd = &cobra.Command{
@@ -126,6 +130,12 @@ var migrateCmd = &cobra.Command{
 				}
 			}
 		}
+		// check if client id and secret exist for google drive 
+
+		if (clientId == "" && clientSecret == "" && source=="google_drive") {
+			return fmt.Errorf("missing google client credentials")
+		}
+
 		if bucket == "" && source == "s3" {
 			bucket, region, prefix, err = util.GetBucketRegionPrefixFromFile(awsCredPath)
 			if err != nil {

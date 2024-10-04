@@ -17,6 +17,7 @@ import (
 	"github.com/0chain/s3migration/dropbox"
 	"github.com/0chain/s3migration/gdrive"
 	T "github.com/0chain/s3migration/types"
+	"golang.org/x/oauth2"
 
 	"github.com/0chain/gosdk/zboxcore/sdk"
 	"github.com/0chain/gosdk/zboxcore/zboxutil"
@@ -143,8 +144,26 @@ func InitMigration(mConfig *MigrationConfig) error {
 			mConfig.WorkDir,
 		)
 	} else if mConfig.Source == "google_drive" {
+		// use client id instead of access token to prevent expiry time
+		ClientID, ClientSecret := util.GetClientCredentialsFromEnv()
+		cfg := oauth2.Config{
+			ClientID: ClientID,
+			ClientSecret: ClientSecret,
+			Endpoint: oauth2.Endpoint{
+				AuthURL       :"https://accounts.google.com/o/oauth2/auth",
+				DeviceAuthURL :"https://oauth2.googleapis.com/device/code",
+				TokenURL      :"https://oauth2.googleapis.com/token",
+			},
+		}
+
+		token := &oauth2.Token{
+			AccessToken: util.GetAccessKeyFromEnv(),
+			RefreshToken: util.GetRefreshKeyFromEnv(),
+		}
+
 		dataSourceStore, err = gdrive.NewGoogleDriveClient(
-			util.GetAccessKeyFromEnv(),
+			cfg,
+			token,
 			mConfig.WorkDir,
 		)
 	} else {
