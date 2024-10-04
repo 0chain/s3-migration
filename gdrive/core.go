@@ -20,12 +20,9 @@ type GoogleDriveClient struct {
 	workDir string
 }
 
-func NewGoogleDriveClient(accessToken string, workDir string) (*GoogleDriveClient, error) {
+func NewGoogleDriveClient(cfg oauth2.Config, token *oauth2.Token, workDir string) (*GoogleDriveClient, error) {
 	ctx := context.Background()
-
-	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: accessToken})
-
-	httpClient := oauth2.NewClient(ctx, tokenSource)
+	httpClient := cfg.Client(ctx, token)
 
 	service, err := drive.NewService(ctx, option.WithHTTPClient(httpClient))
 	if err != nil {
