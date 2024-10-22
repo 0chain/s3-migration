@@ -5,9 +5,11 @@ package s3
 
 import (
 	"context"
-	"github.com/0chain/s3migration/util"
 	"log"
 	"testing"
+	"time"
+
+	"github.com/0chain/s3migration/util"
 )
 
 func TestService_ListAllBuckets(t *testing.T) {
@@ -16,7 +18,7 @@ func TestService_ListAllBuckets(t *testing.T) {
 
 	util.SetAwsEnvCredentials(awsAccessKey, awsSecretKey)
 	s3Svc, _ := GetAwsClient("", "", "", false, nil, nil, "", "")
-	fileListChan, errChan := s3Svc.ListFilesInBucket(context.Background())
+	fileListChan, errChan := s3Svc.ListFiles(context.Background())
 	for {
 		objKey, ok := <-fileListChan
 		if ok {

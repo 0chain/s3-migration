@@ -22,4 +22,7 @@ type MigrationConfig struct {
 	ChunkSize       int64
 	ChunkNumber     int
 	BatchSize       int
+
+	Source      string // "s3" (default) or "google_drive" or "dropbox"
+	AccessToken string // if Source == "google_drive" or "dropbox"
 }

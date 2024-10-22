@@ -3,11 +3,12 @@ package s3
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	T "github.com/0chain/s3migration/types"
 
 	"github.com/0chain/gosdk/core/encryption"
 	zlogger "github.com/0chain/s3migration/logger"
@@ -16,28 +17,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	awsS3 "github.com/aws/aws-sdk-go-v2/service/s3"
 )
-
-//go:generate mockgen -destination mocks/mock_aws.go -package mock_s3 github.com/0chain/s3migration/s3 AwsI
-type AwsI interface {
-	ListFilesInBucket(ctx context.Context) (<-chan *ObjectMeta, <-chan error)
-	GetFileContent(ctx context.Context, objectKey string) (*Object, error)
-	DeleteFile(ctx context.Context, objectKey string) error
-	DownloadToFile(ctx context.Context, objectKey string) (string, error)
-	DownloadToMemory(ctx context.Context, objectKey string, offset int64, chunkSize, objectSize int64) ([]byte, error)
-}
-
-type Object struct {
-	Body          io.Reader
-	ContentType   string
-	ContentLength int64
-}
-
-// ObjectMeta key: object key, size: size of object in bytes
-type ObjectMeta struct {
-	Key         string
-	Size        int64
-	ContentType string
-}
 
 type AwsClient struct {
 	bucket       string
@@ -136,8 +115,8 @@ func (a *AwsClient) getBucketRegion() (region string, err error) {
 	return
 }
 
-func (a *AwsClient) ListFilesInBucket(ctx context.Context) (<-chan *ObjectMeta, <-chan error) {
-	objectMetaChan := make(chan *ObjectMeta, 1000)
+func (a *AwsClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta, <-chan error) {
+	objectMetaChan := make(chan *T.ObjectMeta, 1000)
 	errChan := make(chan error, 1)
 
 	go func() {
@@ -192,20 +171,20 @@ func (a *AwsClient) ListFilesInBucket(ctx context.Context) (<-chan *ObjectMeta, 
 					errChan <- err
 					return
 				}
-				objectMetaChan <- &ObjectMeta{Key: aws.ToString(obj.Key), Size: obj.Size, ContentType: contentType}
+				objectMetaChan <- &T.ObjectMeta{Key: aws.ToString(obj.Key), Size: obj.Size, ContentType: contentType}
 			}
 		}
 	}()
 	return objectMetaChan, errChan
 }
 
-func (a *AwsClient) GetFileContent(ctx context.Context, objectKey string) (*Object, error) {
+func (a *AwsClient) GetFileContent(ctx context.Context, objectKey string) (*T.Object, error) {
 	out, err := a.client.GetObject(ctx, &awsS3.GetObjectInput{Bucket: aws.String(a.bucket), Key: aws.String(objectKey)})
 	if err != nil {
 		return nil, err
 	}
 
-	return &Object{
+	return &T.Object{
 		Body:          out.Body,
 		ContentType:   aws.ToString(out.ContentType),
 		ContentLength: out.ContentLength,

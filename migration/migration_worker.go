@@ -38,6 +38,7 @@ type DownloadObjectMeta struct {
 	ErrChan            chan error
 	IsFileAlreadyExist bool
 	mimeType           string
+	Ext                string
 }
 
 type UploadObjectMeta struct {

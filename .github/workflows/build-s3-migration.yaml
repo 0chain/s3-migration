@@ -87,7 +87,7 @@ jobs:
           aws s3 cp s3mgrt s3://${{ secrets.S3_MGRT_BINARY_BUCKET }}/s3mgrt
 
       - name: 'Upload Artifact'
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: s3mgrt-linux
           path: s3mgrt

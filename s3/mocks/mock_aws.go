@@ -8,7 +8,8 @@ import (
 	context "context"
 	reflect "reflect"
 
-	s3 "github.com/0chain/s3migration/s3"
+	T "github.com/0chain/s3migration/types"
+
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -65,10 +66,10 @@ func (mr *MockAwsIMockRecorder) DownloadToFile(arg0, arg1 interface{}) *gomock.C
 }
 
 // GetFileContent mocks base method.
-func (m *MockAwsI) GetFileContent(arg0 context.Context, arg1 string) (*s3.Object, error) {
+func (m *MockAwsI) GetFileContent(arg0 context.Context, arg1 string) (*T.Object, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetFileContent", arg0, arg1)
-	ret0, _ := ret[0].(*s3.Object)
+	ret0, _ := ret[0].(*T.Object)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -79,17 +80,17 @@ func (mr *MockAwsIMockRecorder) GetFileContent(arg0, arg1 interface{}) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFileContent", reflect.TypeOf((*MockAwsI)(nil).GetFileContent), arg0, arg1)
 }
 
-// ListFilesInBucket mocks base method.
-func (m *MockAwsI) ListFilesInBucket(arg0 context.Context) (<-chan *s3.ObjectMeta, <-chan error) {
+// ListFiles mocks base method.
+func (m *MockAwsI) ListFiles(arg0 context.Context) (<-chan *T.ObjectMeta, <-chan error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListFilesInBucket", arg0)
-	ret0, _ := ret[0].(<-chan *s3.ObjectMeta)
+	ret := m.ctrl.Call(m, "ListFiles", arg0)
+	ret0, _ := ret[0].(<-chan *T.ObjectMeta)
 	ret1, _ := ret[1].(<-chan error)
 	return ret0, ret1
 }
 
-// ListFilesInBucket indicates an expected call of ListFilesInBucket.
-func (mr *MockAwsIMockRecorder) ListFilesInBucket(arg0 interface{}) *gomock.Call {
+// ListFiles indicates an expected call of ListFiles.
+func (mr *MockAwsIMockRecorder) ListFiles(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListFilesInBucket", reflect.TypeOf((*MockAwsI)(nil).ListFilesInBucket), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListFiles", reflect.TypeOf((*MockAwsI)(nil).ListFiles), arg0)
 }

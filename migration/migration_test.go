@@ -6,8 +6,9 @@ import (
 	"log"
 	"testing"
 
+	T "github.com/0chain/s3migration/types"
+
 	mock_dstorage "github.com/0chain/s3migration/dstorage/mocks"
-	"github.com/0chain/s3migration/s3"
 	mock_s3 "github.com/0chain/s3migration/s3/mocks"
 	mock_util "github.com/0chain/s3migration/util/mocks"
 	"github.com/golang/mock/gomock"
@@ -21,12 +22,12 @@ func TestMigrate(t *testing.T) {
 	dStorageService := mock_dstorage.NewMockDStoreI(ctrl)
 	awsStorageService := mock_s3.NewMockAwsI(ctrl)
 	fileSystem := mock_util.NewMockFileSystem(ctrl)
-	migration = Migration{
-		zStore:   dStorageService,
-		awsStore: awsStorageService,
-		skip:     Skip,
-		fs:       fileSystem,
-	}
+	// migration = Migration{
+	// 	zStore:   dStorageService,
+	// 	awsStore: awsStorageService,
+	// 	skip:     Skip,
+	// 	fs:       fileSystem,
+	// }
 
 	tests := []struct {
 		name             string
@@ -39,16 +40,16 @@ func TestMigrate(t *testing.T) {
 			name: "success in uploading files",
 			setUpMock: func() {
 				rootContext, rootContextCancel = context.WithCancel(context.Background())
-				fileListChan := make(chan *s3.ObjectMeta, 1000)
-				fileListChan <- &s3.ObjectMeta{
+				fileListChan := make(chan *T.ObjectMeta, 1000)
+				fileListChan <- &T.ObjectMeta{
 					Key: "file1", Size: 1200,
 				}
 
-				fileListChan <- &s3.ObjectMeta{
+				fileListChan <- &T.ObjectMeta{
 					Key: "file2", Size: 1400,
 				}
 
-				fileListChan <- &s3.ObjectMeta{
+				fileListChan <- &T.ObjectMeta{
 					Key: "file3", Size: 1500,
 				}
 
@@ -56,7 +57,7 @@ func TestMigrate(t *testing.T) {
 
 				errChan := make(chan error, 1)
 				close(errChan)
-				awsStorageService.EXPECT().ListFilesInBucket(gomock.Any()).Return(fileListChan, errChan)
+				awsStorageService.EXPECT().ListFiles(gomock.Any()).Return(fileListChan, errChan)
 
 				awsStorageService.EXPECT().DownloadToFile(gomock.Any(), "file1").Return("/aws/file1", nil)
 				awsStorageService.EXPECT().DownloadToFile(gomock.Any(), "file2").Return("/aws/file2", nil)
@@ -106,8 +107,8 @@ func TestMigrate(t *testing.T) {
 			name: "download to file error",
 			setUpMock: func() {
 				rootContext, rootContextCancel = context.WithCancel(context.Background())
-				fileListChan := make(chan *s3.ObjectMeta, 1000)
-				fileListChan <- &s3.ObjectMeta{
+				fileListChan := make(chan *T.ObjectMeta, 1000)
+				fileListChan <- &T.ObjectMeta{
 					Key: "file11", Size: 1200,
 				}
 
@@ -115,7 +116,7 @@ func TestMigrate(t *testing.T) {
 
 				errChan := make(chan error, 1)
 				close(errChan)
-				awsStorageService.EXPECT().ListFilesInBucket(gomock.Any()).Return(fileListChan, errChan)
+				awsStorageService.EXPECT().ListFiles(gomock.Any()).Return(fileListChan, errChan)
 
 				updateKeyFunc = func(statePath string) (func(stateKey string), func(), error) {
 					return func(stateKey string) {}, func() {}, nil
@@ -132,8 +133,8 @@ func TestMigrate(t *testing.T) {
 			name: "dstorage upload error",
 			setUpMock: func() {
 				rootContext, rootContextCancel = context.WithCancel(context.Background())
-				fileListChan := make(chan *s3.ObjectMeta, 1000)
-				fileListChan <- &s3.ObjectMeta{
+				fileListChan := make(chan *T.ObjectMeta, 1000)
+				fileListChan <- &T.ObjectMeta{
 					Key: "file10", Size: 1200,
 				}
 
@@ -141,7 +142,7 @@ func TestMigrate(t *testing.T) {
 
 				errChan := make(chan error, 1)
 				close(errChan)
-				awsStorageService.EXPECT().ListFilesInBucket(gomock.Any()).Return(fileListChan, errChan)
+				awsStorageService.EXPECT().ListFiles(gomock.Any()).Return(fileListChan, errChan)
 
 				updateKeyFunc = func(statePath string) (func(stateKey string), func(), error) {
 					return func(stateKey string) {}, func() {}, nil
@@ -171,14 +172,14 @@ func TestMigrate(t *testing.T) {
 			name: "aws list object error",
 			setUpMock: func() {
 				rootContext, rootContextCancel = context.WithCancel(context.Background())
-				fileListChan := make(chan *s3.ObjectMeta, 1000)
+				fileListChan := make(chan *T.ObjectMeta, 1000)
 
 				close(fileListChan)
 
 				errChan := make(chan error, 1)
 				errChan <- errors.New("some error")
 
-				awsStorageService.EXPECT().ListFilesInBucket(gomock.Any()).Return(fileListChan, errChan)
+				awsStorageService.EXPECT().ListFiles(gomock.Any()).Return(fileListChan, errChan)
 
 				updateKeyFunc = func(statePath string) (func(stateKey string), func(), error) {
 					return func(stateKey string) {}, func() {}, nil
