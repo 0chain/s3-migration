@@ -116,8 +116,8 @@ var migrateCmd = &cobra.Command{
 			}
 		}
 
-		if source == "" {
-			source = "s3"
+		if source == "" || (source != "google_drive" && source != "s3" && source != "dropbox") {
+			source = "s3" // Default to "s3"
 		}
 
 		if (accessKey == "" || secretKey == "") && source == "s3" {
