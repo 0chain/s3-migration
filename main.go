@@ -1,19 +1,15 @@
 package main
 
 import (
-	"fmt"
 	"os"
+	"testing"
 
-	"github.com/0chain/s3migration/cmd"
+	s3 "github.com/0chain/s3migration/s3"
 	_ "github.com/golang/mock/mockgen/model"
 )
 
 func main() {
-	err := cmd.Execute()
-	if err != nil {
-		fmt.Println("Exiting migration due to error: ", err)
-		os.Exit(1)
-	}
+	t := &testing.T{}
 
 	os.Exit(0)
 }
