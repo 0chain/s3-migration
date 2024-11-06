@@ -16,6 +16,7 @@ type ObjectMeta struct {
 	Key         string
 	Size        int64
 	ContentType string
+	Id 			*string
 	Ext         string
 }
 
