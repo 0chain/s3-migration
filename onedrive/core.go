@@ -24,10 +24,10 @@ type OneDriveClient struct {
 	workDir string
 }
 
-func NewOneDriveClient(token string, workDir string) (*OneDriveClient, error) {
+func NewOneDriveClient(token *oauth2.Token, workDir string) (*OneDriveClient, error) {
 	ctx := context.Background()
 	ts := oauth2.StaticTokenSource(
-			&oauth2.Token{AccessToken: token},
+			token,
 	)
 	tc := oauth2.NewClient(ctx, ts)
 

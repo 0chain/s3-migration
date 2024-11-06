@@ -16,6 +16,7 @@ import (
 
 	"github.com/0chain/s3migration/dropbox"
 	"github.com/0chain/s3migration/gdrive"
+	"github.com/0chain/s3migration/onedrive"
 	T "github.com/0chain/s3migration/types"
 	"golang.org/x/oauth2"
 
@@ -166,6 +167,17 @@ func InitMigration(mConfig *MigrationConfig) error {
 			token,
 			mConfig.WorkDir,
 		)
+	}else if mConfig.Source == "onedrive" {
+		// use access token and refresh token to prevent expiry time
+		token := &oauth2.Token{
+			AccessToken: util.GetAccessKeyFromEnv(), 
+			RefreshToken: util.GetRefreshKeyFromEnv(),
+		}
+		dataSourceStore, err = onedrive.NewOneDriveClient(
+			token,
+			mConfig.WorkDir,
+		)
+
 	} else {
 		zlogger.Logger.Error("invalid source: ", mConfig.Source)
 		return err
