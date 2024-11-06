@@ -6,11 +6,17 @@ import (
 	"testing"
 
 	zlogger "github.com/0chain/s3migration/logger"
+	"golang.org/x/oauth2"
 )
 
 var (
-	token=""
-	testFileID=""
+	refresh="REFRESH"
+	access="ACCESS"
+	testFileID="FileId"
+	token =&oauth2.Token{
+		AccessToken: access,
+		RefreshToken: refresh,
+	}
 )
 
 func TestOneDriveClient_ListFiles(t *testing.T) {
