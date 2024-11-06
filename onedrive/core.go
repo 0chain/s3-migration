@@ -85,7 +85,7 @@ func (g *OneDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta, <
 				Size: entry.Size,
 				ContentType: mimeType,
 				Ext: filepath.Ext(entry.DownloadURL),
-				Id: entry.Id,
+				Id: &entry.Id,
 			}
 		}
 	}()
