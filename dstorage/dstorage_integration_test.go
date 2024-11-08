@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/0chain/gosdk/core/client"
 	"github.com/0chain/gosdk/core/conf"
 	"github.com/0chain/gosdk/core/zcncrypto"
 	"github.com/0chain/gosdk/zboxcore/blockchain"
@@ -106,7 +107,7 @@ func initDStorageSDK() {
 		os.Exit(1)
 	}
 
-	if err := sdk.InitStorageSDK(clientConfig, cfg.BlockWorker, cfg.ChainID, cfg.SignatureScheme, cfg.PreferredBlobbers); err != nil {
+	if err := client.InitSDK(clientConfig, cfg.BlockWorker, cfg.ChainID, cfg.SignatureScheme, 0, false, true); err != nil {
 		panic(err)
 	}
 

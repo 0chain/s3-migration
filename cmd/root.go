@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/0chain/gosdk/core/client"
 	"os"
 	"path/filepath"
 
@@ -11,8 +13,6 @@ import (
 	"github.com/0chain/s3migration/util"
 
 	"github.com/spf13/cobra"
-
-	"github.com/0chain/gosdk/zboxcore/blockchain"
 
 	"github.com/0chain/gosdk/core/zcncrypto"
 
@@ -78,11 +78,6 @@ func initConfig() {
 		panic(err)
 	}
 
-	network, err := conf.LoadNetworkFile(filepath.Join(configDir, networkFile))
-	if err != nil {
-		// panic(err)
-		fmt.Println(err)
-	}
 	// syncing loggers
 	logger.SyncLoggers([]*logger.Logger{zcncore.GetLogger(), sdk.GetLogger()})
 
@@ -91,20 +86,15 @@ func initConfig() {
 	sdk.SetLogFile("cmdlog.log", !bSilent)
 	zlogger.SetLogFile("s3migration.log", !bSilent)
 
-	if network.IsValid() {
-		zcncore.SetNetwork(network.Miners, network.Sharders)
-		conf.InitChainNetwork(&conf.Network{
-			Miners:   network.Miners,
-			Sharders: network.Sharders,
-		})
-	}
-
-	err = zcncore.InitZCNSDK(cfg.BlockWorker, cfg.SignatureScheme,
-		zcncore.WithChainID(cfg.ChainID),
-		zcncore.WithMinSubmit(cfg.MinSubmit),
-		zcncore.WithMinConfirmation(cfg.MinConfirmation),
-		zcncore.WithConfirmationChainLength(cfg.ConfirmationChainLength))
-
+	err = client.Init(context.Background(), conf.Config{
+		ChainID:         cfg.ChainID,
+		BlockWorker:     cfg.BlockWorker,
+		SignatureScheme: cfg.SignatureScheme,
+		MaxTxnQuery:     5,
+		QuerySleepTime:  5,
+		MinSubmit:       10,
+		MinConfirmation: 10,
+	})
 	if err != nil {
 		panic(err)
 	}
@@ -160,19 +150,11 @@ func initConfig() {
 	}
 
 	//init the storage sdk with the known miners, sharders and client wallet info
-	if err := sdk.InitStorageSDK(clientConfig, cfg.BlockWorker, cfg.ChainID, cfg.SignatureScheme, cfg.PreferredBlobbers, nonce); err != nil {
+	if err := client.InitSDK(clientConfig, cfg.BlockWorker, cfg.ChainID, cfg.SignatureScheme, nonce, false, true); err != nil {
 		panic(err)
 	}
 
-	// additional settings depending network latency
-	blockchain.SetMaxTxnQuery(cfg.MaxTxnQuery)
-	blockchain.SetQuerySleepTime(cfg.QuerySleepTime)
-
 	conf.InitClientConfig(&cfg)
-
-	if network.IsValid() {
-		sdk.SetNetwork(network.Miners, network.Sharders)
-	}
 
 	sdk.SetNumBlockDownloads(10)
 

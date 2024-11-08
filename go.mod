@@ -1,12 +1,12 @@
 module github.com/0chain/s3migration
 
-go 1.21
+go 1.22.0
 
-toolchain go1.22.2
+toolchain go1.22.5
 
 require (
 	github.com/0chain/errors v1.0.3
-	github.com/0chain/gosdk v1.17.9
+	github.com/0chain/gosdk v1.18.0-RC6
 	github.com/aws/aws-sdk-go-v2 v1.17.1
 	github.com/aws/aws-sdk-go-v2/config v1.17.10
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.37
@@ -24,6 +24,7 @@ require (
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	github.com/andybalholm/brotli v1.0.5 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
+	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
@@ -36,12 +37,13 @@ require (
 	github.com/klauspost/compress v1.17.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.51.0 // indirect
+	github.com/x448/float16 v0.8.4 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0 // indirect
 	go.opentelemetry.io/otel v1.24.0 // indirect
 	go.opentelemetry.io/otel/metric v1.24.0 // indirect
 	go.opentelemetry.io/otel/trace v1.24.0 // indirect
-	golang.org/x/net v0.22.0 // indirect
+	golang.org/x/net v0.23.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240318140521-94a12d6c2237 // indirect
 	google.golang.org/grpc v1.62.1 // indirect
@@ -49,7 +51,7 @@ require (
 )
 
 require (
-	github.com/0chain/common v0.0.6-0.20230127095721-8df4d1d72565 // indirect
+	github.com/0chain/common v1.18.0 // indirect
 	github.com/Luzifer/go-openssl/v3 v3.1.0 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.4.9 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.12.23 // indirect
@@ -116,10 +118,10 @@ require (
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
-	golang.org/x/crypto v0.21.0 // indirect
-	golang.org/x/sync v0.6.0 // indirect
-	golang.org/x/sys v0.18.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/crypto v0.26.0 // indirect
+	golang.org/x/sync v0.8.0 // indirect
+	golang.org/x/sys v0.23.0 // indirect
+	golang.org/x/text v0.17.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
