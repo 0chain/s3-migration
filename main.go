@@ -1,16 +1,19 @@
 package main
 
 import (
+	"fmt"
 	"os"
-	"testing"
 
-	onedrive "github.com/0chain/s3migration/onedrive"
+	"github.com/0chain/s3migration/cmd"
 	_ "github.com/golang/mock/mockgen/model"
 )
 
 func main() {
-	t := &testing.T{}
-	// onedrive.TestOneDriveClient_ListFiles(t)
-	onedrive.TestOneDriveClient_GetFileContent(t)
+	err := cmd.Execute()
+	if err != nil {
+		fmt.Println("Exiting migration due to error: ", err)
+		os.Exit(1)
+	}
+
 	os.Exit(0)
 }
