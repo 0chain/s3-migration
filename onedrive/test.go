@@ -10,11 +10,11 @@ import (
 )
 
 var (
-	refresh="REFRESH"
-	access="ACCESS"
-	testFileID="FileId"
-	token =&oauth2.Token{
-		AccessToken: access,
+	refresh    = "REFRESH"
+	access     = "ACCESS"
+	testFileID = "FileId"
+	token      = &oauth2.Token{
+		AccessToken:  access,
 		RefreshToken: refresh,
 	}
 )
@@ -66,7 +66,6 @@ func TestOneDriveClient_GetFileContent(t *testing.T) {
 
 }
 
-
 func TestOneDriveDeleteFile(t *testing.T) {
 	client, err := NewOneDriveClient(token, "./")
 	if err != nil {
@@ -82,7 +81,6 @@ func TestOneDriveDeleteFile(t *testing.T) {
 	}
 	zlogger.Logger.Info("File deleted successfully")
 }
-
 
 func TestOneDriveDownloadFile(t *testing.T) {
 	client, err := NewOneDriveClient(token, "./")

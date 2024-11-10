@@ -20,26 +20,26 @@ import (
 )
 
 type OneDriveClient struct {
-	client *drive.Client 
+	client  *drive.Client
 	workDir string
 }
 
 func NewOneDriveClient(token *oauth2.Token, workDir string) (*OneDriveClient, error) {
 	ctx := context.Background()
 	ts := oauth2.StaticTokenSource(
-			token,
+		token,
 	)
 	tc := oauth2.NewClient(ctx, ts)
 
 	client := drive.NewClient(tc)
 	_, err := client.Drives.List(ctx)
-	
+
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid Access token")
 	}
 
 	return &OneDriveClient{
-		client: client,
+		client:  client,
 		workDir: workDir,
 	}, nil
 }
@@ -49,12 +49,12 @@ func (g *OneDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta, <
 	errChan := make(chan error)
 
 	if g.client == nil {
-	    errChan <- fmt.Errorf("client is not initialized")
-    	return objectChan, errChan
+		errChan <- fmt.Errorf("client is not initialized")
+		return objectChan, errChan
 	}
 
 	go func() {
-		defer func()  {
+		defer func() {
 			close(objectChan)
 			close(errChan)
 		}()
@@ -70,8 +70,8 @@ func (g *OneDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta, <
 			errChan <- err
 			return
 		}
-		for _, entry := range filesRes.DriveItems{
-			 // Safely access the MIME type
+		for _, entry := range filesRes.DriveItems {
+			// Safely access the MIME type
 			mimeType := "None"
 
 			// Check if the File field is not nil
@@ -79,27 +79,25 @@ func (g *OneDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta, <
 				mimeType = entry.File.MIMEType
 			}
 
-
 			objectChan <- &T.ObjectMeta{
-				Key: entry.Name,
-				Size: entry.Size,
+				Key:         entry.Name,
+				Size:        entry.Size,
 				ContentType: mimeType,
-				Ext: filepath.Ext(entry.DownloadURL),
-				Id: &entry.Id,
+				Ext:         filepath.Ext(entry.DownloadURL),
+				Id:          &entry.Id,
 			}
 		}
 	}()
 
-  	go func() {
-        for err := range errChan {
-            fmt.Println("Error:", err) // Use a proper logging library if needed
-        }
-    }()
+	go func() {
+		for err := range errChan {
+			fmt.Println("Error:", err) // Use a proper logging library if needed
+		}
+	}()
 
-		return objectChan, errChan
+	return objectChan, errChan
 
-	}
-
+}
 
 func (g *OneDriveClient) GetFileContent(ctx context.Context, fileID string) (*T.Object, error) {
 	entry_item, err := g.client.DriveItems.Get(ctx, fileID)
@@ -109,38 +107,38 @@ func (g *OneDriveClient) GetFileContent(ctx context.Context, fileID string) (*T.
 	}
 
 	resp, err := http.Get(entry_item.DownloadURL)
-    if err != nil {
-        fmt.Println("Error making GET request:", err)
+	if err != nil {
+		fmt.Println("Error making GET request:", err)
 		return nil, err
-    }
-    defer resp.Body.Close()
+	}
+	defer resp.Body.Close()
 
-	 if resp.StatusCode != http.StatusOK {
-        body, _ := io.ReadAll(resp.Body)
-        return nil, errors.New(string(body))
-    }
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, errors.New(string(body))
+	}
 
 	localPath := entry_item.Name
-    outFile, err := os.Create(localPath)
-    if err != nil {
-        return nil, fmt.Errorf("failed to create file: %w", err)
-    }
-    defer outFile.Close()
-	
-    _, err = io.Copy(outFile, resp.Body)
-    if err != nil {
-        return nil, fmt.Errorf("failed to write file: %w", err)
-    }
+	outFile, err := os.Create(localPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create file: %w", err)
+	}
+	defer outFile.Close()
 
-    fmt.Println("File downloaded successfully:", localPath)
-	
+	_, err = io.Copy(outFile, resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write file: %w", err)
+	}
+
+	fmt.Println("File downloaded successfully:", localPath)
+
 	fmt.Println(entry_item.Size)
-    // Create the Object with the response data
-    obj := &T.Object{
-        Body:         resp.Body,
-        ContentType:  resp.Header.Get("Content-Type"),
-        ContentLength: entry_item.Size,
-    }
+	// Create the Object with the response data
+	obj := &T.Object{
+		Body:          resp.Body,
+		ContentType:   resp.Header.Get("Content-Type"),
+		ContentLength: entry_item.Size,
+	}
 
 	return obj, nil
 }
@@ -155,7 +153,6 @@ func (g *OneDriveClient) DeleteFile(ctx context.Context, fileID string) error {
 	return nil
 }
 
-
 func (g *OneDriveClient) DownloadToFile(ctx context.Context, fileID string) (string, error) {
 	entry_item, err := g.client.DriveItems.Get(ctx, fileID)
 
@@ -164,18 +161,18 @@ func (g *OneDriveClient) DownloadToFile(ctx context.Context, fileID string) (str
 	}
 
 	resp, err := http.Get(entry_item.DownloadURL)
-    if err != nil {
-        fmt.Println("Error making GET request:", err)
+	if err != nil {
+		fmt.Println("Error making GET request:", err)
 		return "", err
-    }
-    defer resp.Body.Close()
+	}
+	defer resp.Body.Close()
 
-	 if resp.StatusCode != http.StatusOK {
-        body, _ := io.ReadAll(resp.Body)
-        return "", errors.New(string(body))
-    }
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", errors.New(string(body))
+	}
 
-	destinationPath := path.Join(g.workDir, entry_item.Name )
+	destinationPath := path.Join(g.workDir, entry_item.Name)
 
 	out, err := os.Create(destinationPath)
 	if err != nil {
@@ -183,7 +180,7 @@ func (g *OneDriveClient) DownloadToFile(ctx context.Context, fileID string) (str
 	}
 
 	defer out.Close()
-	
+
 	_, err = io.Copy(out, resp.Body)
 	if err != nil {
 		return "", err
@@ -193,7 +190,6 @@ func (g *OneDriveClient) DownloadToFile(ctx context.Context, fileID string) (str
 	return destinationPath, nil
 }
 
-
 func (g *OneDriveClient) DownloadToMemory(ctx context.Context, fileID string, offset int64, chunkSize, fileSize int64) ([]byte, error) {
 
 	limit := offset + chunkSize - 1
@@ -201,7 +197,7 @@ func (g *OneDriveClient) DownloadToMemory(ctx context.Context, fileID string, of
 		limit = fileSize
 	}
 
-	req, err  := g.client.DriveItems.Get(ctx, fileID)
+	req, err := g.client.DriveItems.Get(ctx, fileID)
 
 	if err != nil {
 		return nil, err
@@ -242,4 +238,3 @@ func (g *OneDriveClient) DownloadToMemory(ctx context.Context, fileID string, of
 
 	return data, nil
 }
-

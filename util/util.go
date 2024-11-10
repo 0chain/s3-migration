@@ -59,7 +59,6 @@ func SetAwsEnvCredentials(accessKey, secretKey string) (err error) {
 	return os.Setenv("AWS_SECRET_ACCESS_KEY", secretKey)
 }
 
-
 func SetClientCredentials(clientId, clientSecret string) (err error) {
 	err = os.Setenv("CLIENT_ID", clientId)
 	if err != nil {
@@ -116,11 +115,11 @@ func GetClientCredentialsFromEnv() (string, string) {
 	return os.Getenv("CLIENT_ID"), os.Getenv("CLIENT_SECRET")
 }
 
-func GetAccessKeyFromEnv() (string) {
+func GetAccessKeyFromEnv() string {
 	return os.Getenv("AWS_ACCESS_KEY_ID")
 }
 
-func GetRefreshKeyFromEnv() (string) {
+func GetRefreshKeyFromEnv() string {
 	return os.Getenv("AWS_SECRET_ACCESS_KEY")
 }
 

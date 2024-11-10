@@ -41,8 +41,8 @@ var (
 	chunkNumber                int
 	batchSize                  int
 	source                     string
-	clientId				   string
-	clientSecret 			   string
+	clientId                   string
+	clientSecret               string
 )
 
 // migrateCmd is the migrateFromS3 sub command to migrate whole objects from some buckets.
@@ -130,9 +130,9 @@ var migrateCmd = &cobra.Command{
 				}
 			}
 		}
-		// check if client id and secret exist for google drive 
+		// check if client id and secret exist for google drive
 
-		if (clientId == "" && clientSecret == "" && source=="google_drive") {
+		if clientId == "" && clientSecret == "" && source == "google_drive" {
 			return fmt.Errorf("missing google client credentials")
 		}
 
@@ -245,7 +245,7 @@ var migrateCmd = &cobra.Command{
 			ChunkSize:       chunkSize,
 			ChunkNumber:     chunkNumber,
 			BatchSize:       batchSize,
-			Source:      source,
+			Source:          source,
 		}
 
 		if err := migration.InitMigration(&mConfig); err != nil {
@@ -301,4 +301,3 @@ func getTimeFromDHString(s string) (t time.Time, err error) {
 // 	}
 // 	return
 // }
-

@@ -10,11 +10,11 @@ import (
 )
 
 var (
-	driveAccessToken = ""
-	testFileID       = "";
-	driveRefreshToken = "";
-	clientId = "";
-	clientSecret = "";
+	driveAccessToken  = ""
+	testFileID        = ""
+	driveRefreshToken = ""
+	clientId          = ""
+	clientSecret      = ""
 )
 
 // using: https://developers.google.com/oauthplayground

@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/0chain/gosdk/core/client"
 	"os"
 	"path/filepath"
+
+	"github.com/0chain/gosdk/core/client"
 
 	"github.com/0chain/gosdk/core/conf"
 	"github.com/0chain/gosdk/core/logger"

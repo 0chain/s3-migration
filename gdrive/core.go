@@ -75,7 +75,7 @@ func (g *GoogleDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta
 				Key:         file.Id,
 				Size:        file.Size,
 				ContentType: file.MimeType,
-				Ext: file.FileExtension,
+				Ext:         file.FileExtension,
 			}
 		}
 
@@ -146,7 +146,7 @@ func (g *GoogleDriveClient) DownloadToFile(ctx context.Context, fileID string) (
 	}
 
 	zlogger.Logger.Info(fmt.Sprintf("Original File Name: %s", file.Name))
-	destinationPath := path.Join(g.workDir, file.Name )
+	destinationPath := path.Join(g.workDir, file.Name)
 
 	out, err := os.Create(destinationPath)
 	if err != nil {
