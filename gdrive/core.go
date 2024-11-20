@@ -195,3 +195,51 @@ func (g *GoogleDriveClient) DownloadToMemory(ctx context.Context, fileID string,
 
 	return data, nil
 }
+
+func generateLargeFile(filename string, size int64) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	data := make([]byte, 10*1024*1024) // 1MB chunk
+	for i := int64(0); i < size/(1024*1024); i++ {
+		_, err := file.Write(data)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (g *GoogleDriveClient) UploadFile(ctx context.Context) (*drive.File, error) {
+	filename := "large_10.txt"
+	_ = generateLargeFile(filename, 1024*1024*1024)
+
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, fmt.Errorf("unable to open file: %v", err)
+	}
+	defer file.Close()
+
+	if err != nil {
+		return nil, fmt.Errorf("unable to get file stats: %v", err)
+	}
+
+	driveFile := &drive.File{
+		Name:     filename,
+		MimeType: "text/plain",
+	}
+
+	createCall := g.service.Files.Create(driveFile).Media(file).ProgressUpdater(func(now, size int64) { fmt.Printf("%d, %d\r", now, size) })
+
+	res, err := createCall.Do()
+
+	if err != nil {
+		zlogger.Logger.Fatal(err)
+		return nil, err
+	}
+	return res, nil
+}
