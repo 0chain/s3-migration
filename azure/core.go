@@ -1,0 +1,154 @@
+package gdrive
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"log"
+	"os"
+	"path"
+
+	zlogger "github.com/0chain/s3migration/logger"
+	T "github.com/0chain/s3migration/types"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"golang.org/x/oauth2"
+)
+
+type AzureClient struct {
+	service *azblob.Client
+	workDir string
+}
+
+func NewAzureClient(cfg oauth2.Config, token *oauth2.Token, workDir, accountName, connectionString string) (*AzureClient, error) {
+
+	blobURL := fmt.Sprintf("https://%s.blob.core.windows.net", accountName)
+	client, err := azblob.NewClientFromConnectionString(connectionString, &azblob.ClientOptions{Audience: blobURL})
+
+	if err != nil {
+		log.Fatalf("failed to create blob client: %v", err)
+	}
+
+	return &AzureClient{
+		service: client,
+		workDir: workDir,
+	}, nil
+}
+
+func (g *AzureClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta, <-chan error) {
+	objectChan := make(chan *T.ObjectMeta)
+	errChan := make(chan error)
+	containerName := g.workDir
+
+	go func() {
+		defer func() {
+			close(objectChan)
+			close(errChan)
+		}()
+
+		pager := g.service.NewListBlobsFlatPager(containerName, &azblob.ListBlobsFlatOptions{
+			Include: azblob.ListBlobsInclude{Snapshots: true, Versions: true},
+		})
+
+		for pager.More() {
+			resp, err := pager.NextPage(context.TODO())
+
+			if err != nil {
+				errChan <- err
+				return
+			}
+
+			for _, blob := range resp.Segment.BlobItems {
+				fmt.Println(*blob.Name)
+				objectChan <- &T.ObjectMeta{
+					Key:         *blob.Name,
+					Size:        *blob.Properties.ContentLength,
+					ContentType: *blob.Properties.ContentType,
+					Ext:         path.Ext(*blob.Name),
+				}
+			}
+		}
+
+	}()
+
+	return objectChan, errChan
+}
+
+func (g *AzureClient) GetFileContent(ctx context.Context, fileID string) (*T.Object, error) {
+	resp, err := g.service.DownloadStream(ctx, g.workDir, fileID, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	obj := &T.Object{
+		Body:          resp.Body,
+		ContentType:   *resp.ContentType,
+		ContentLength: *resp.ContentLength,
+	}
+
+	return obj, nil
+}
+
+func (g *AzureClient) DeleteFile(ctx context.Context, fileID string) error {
+	_, err := g.service.DeleteBlob(ctx, g.workDir, fileID, nil)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (g *AzureClient) DownloadToFile(ctx context.Context, fileID string) (string, error) {
+	resp, err := g.service.DownloadStream(ctx, g.workDir, fileID, nil)
+	if err != nil {
+		return "", err
+	}
+
+	zlogger.Logger.Info(fmt.Sprintf("Original File Name: %s", fileID))
+	destinationPath := fileID
+
+	out, err := os.Create(destinationPath)
+	if err != nil {
+		return "", err
+	}
+
+	defer out.Close()
+
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	zlogger.Logger.Info(fmt.Sprintf("Downloaded file ID: %s to %s\n", fileID, destinationPath))
+	return destinationPath, nil
+}
+
+func (g *AzureClient) DownloadToMemory(ctx context.Context, fileID string, offset int64, chunkSize, fileSize int64) ([]byte, error) {
+	limit := offset + chunkSize - 1
+	if limit > fileSize {
+		limit = fileSize
+	}
+
+	resp, err := g.service.DownloadStream(ctx, g.workDir, fileID, &azblob.DownloadStreamOptions{
+		Range: azblob.HTTPRange{ // Pass by value, no `&` needed here
+			Offset: offset,
+			Count:  chunkSize,
+		},
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to download chunk: %w", err)
+	}
+	defer resp.Body.Close()
+
+	data := make([]byte, chunkSize)
+
+	n, err := io.ReadFull(resp.Body, data)
+	if err != nil && err != io.ErrUnexpectedEOF {
+		return nil, fmt.Errorf("error reading blob content: %w", err)
+	}
+
+	if int64(n) < chunkSize && fileSize != chunkSize {
+		data = data[:n]
+	}
+
+	return data, nil
+}
