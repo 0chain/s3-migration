@@ -24,13 +24,13 @@ type GoogleCloudClient struct {
 func NewGoogleCloudClient(cfg oauth2.Config, token *oauth2.Token, workDir string) (*GoogleCloudClient, error) {
 
 	ctx := context.Background()
- 	opts := []option.ClientOption{
-        option.WithTokenSource(oauth2.StaticTokenSource(&oauth2.Token{
-            AccessToken: token.AccessToken,
-        })),
-    }
+	opts := []option.ClientOption{
+		option.WithTokenSource(oauth2.StaticTokenSource(&oauth2.Token{
+			AccessToken: token.AccessToken,
+		})),
+	}
 
-    client, err := storage.NewClient(ctx, opts...)
+	client, err := storage.NewClient(ctx, opts...)
 
 	if err != nil {
 		return nil, err
@@ -97,16 +97,16 @@ func (g *GoogleCloudClient) GetFileContent(ctx context.Context, fileID string) (
 
 func (g *GoogleCloudClient) DeleteFile(ctx context.Context, fileID string) error {
 	err := g.service.Bucket(g.workDir).Object(fileID).Delete(ctx)
-	 if err != nil {
-        if strings.Contains(err.Error(), "storage: object doesn't exist") {
+	if err != nil {
+		if strings.Contains(err.Error(), "storage: object doesn't exist") {
 			zlogger.Logger.Error(fmt.Sprintf("File %s does not exist, skipping deletion.", fileID))
-            return nil 
-        }
+			return nil
+		}
 		zlogger.Logger.Error(fmt.Sprintf("Error while deleting file %s: %v", fileID, err))
-        return err
-    }
+		return err
+	}
 	zlogger.Logger.Error(fmt.Sprintf("File  %s deleted successfully", fileID))
-    return nil 
+	return nil
 }
 
 func (g *GoogleCloudClient) DownloadToFile(ctx context.Context, fileID string) (string, error) {
