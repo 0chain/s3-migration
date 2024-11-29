@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path"
 
@@ -22,7 +23,17 @@ type GoogleDriveClient struct {
 
 func NewGoogleDriveClient(cfg oauth2.Config, token *oauth2.Token, workDir string) (*GoogleDriveClient, error) {
 	ctx := context.Background()
-	httpClient := cfg.Client(ctx, token)
+	var httpClient *http.Client
+
+	if cfg.ClientID == "" || cfg.ClientSecret == "" {
+		tokenSource := oauth2.StaticTokenSource(&oauth2.Token{
+			AccessToken:  driveAccessToken,
+			RefreshToken: driveRefreshToken,
+		})
+		httpClient = oauth2.NewClient(ctx, tokenSource)
+	} else {
+		httpClient = cfg.Client(ctx, token)
+	}
 
 	service, err := drive.NewService(ctx, option.WithHTTPClient(httpClient))
 	if err != nil {
