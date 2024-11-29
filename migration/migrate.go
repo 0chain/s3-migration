@@ -147,17 +147,17 @@ func InitMigration(mConfig *MigrationConfig) error {
 		// use client id instead of access token to prevent expiry time
 		ClientID, ClientSecret := util.GetClientCredentialsFromEnv()
 		cfg := oauth2.Config{
-			ClientID: ClientID,
+			ClientID:     ClientID,
 			ClientSecret: ClientSecret,
 			Endpoint: oauth2.Endpoint{
-				AuthURL       :"https://accounts.google.com/o/oauth2/auth",
-				DeviceAuthURL :"https://oauth2.googleapis.com/device/code",
-				TokenURL      :"https://oauth2.googleapis.com/token",
+				AuthURL:       "https://accounts.google.com/o/oauth2/auth",
+				DeviceAuthURL: "https://oauth2.googleapis.com/device/code",
+				TokenURL:      "https://oauth2.googleapis.com/token",
 			},
 		}
 
 		token := &oauth2.Token{
-			AccessToken: util.GetAccessKeyFromEnv(),
+			AccessToken:  util.GetAccessKeyFromEnv(),
 			RefreshToken: util.GetRefreshKeyFromEnv(),
 		}
 
@@ -459,7 +459,7 @@ func getUniqueShortObjKey(objectKey string) string {
 }
 
 func getRemotePath(objectKey string) string {
-	return filepath.Join(migration.migrateTo, migration.bucket, getUniqueShortObjKey(objectKey))
+	return path.Join(migration.migrateTo, migration.bucket, getUniqueShortObjKey(objectKey))
 }
 
 func checkIsFileExist(ctx context.Context, downloadObj *DownloadObjectMeta) error {
