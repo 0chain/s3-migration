@@ -130,11 +130,6 @@ var migrateCmd = &cobra.Command{
 				}
 			}
 		}
-		// check if client id and secret exist for google drive
-
-		if clientId == "" && clientSecret == "" && source == "google_drive" {
-			return fmt.Errorf("missing google client credentials")
-		}
 
 		if bucket == "" && source == "s3" {
 			bucket, region, prefix, err = util.GetBucketRegionPrefixFromFile(awsCredPath)
