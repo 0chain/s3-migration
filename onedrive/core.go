@@ -144,7 +144,7 @@ func (g *OneDriveClient) GetFileContent(ctx context.Context, fileID string) (*T.
 
 func (g *OneDriveClient) DeleteFile(ctx context.Context, fileID string) error {
 	driveId := ""
-	_, err := g.client.DriveItems.Delete(ctx, driveId, fileID)
+	err := g.client.DriveItems.Delete(ctx, driveId, fileID)
 
 	if err != nil {
 		return err
