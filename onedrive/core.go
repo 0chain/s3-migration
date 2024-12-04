@@ -12,8 +12,7 @@ import (
 	zlogger "github.com/0chain/s3migration/logger"
 	T "github.com/0chain/s3migration/types"
 
-	// drive "github.com/goh-chunlin/go-onedrive/onedrive"
-	drive "github.com/goh-chunlin/go-onedrive/onedrive"
+	drive "github.com/pewssh/onedrive/onedrive"
 
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2"

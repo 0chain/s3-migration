@@ -1,6 +1,6 @@
 module github.com/0chain/s3migration
 
-go 1.22.0
+go 1.22.4
 
 toolchain go1.22.5
 
@@ -13,8 +13,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.17.10
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.37
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.29.1
-	github.com/goh-chunlin/go-onedrive/onedrive v0.0.0-20201229161802-ea6494991717
 	github.com/golang/mock v1.6.0
+	github.com/pewssh/onedrive v0.0.0-20241204163236-37fbf9472804
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.15.0
 	golang.org/x/oauth2 v0.23.0
