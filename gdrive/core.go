@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path"
 
@@ -22,7 +23,17 @@ type GoogleDriveClient struct {
 
 func NewGoogleDriveClient(cfg oauth2.Config, token *oauth2.Token, workDir string) (*GoogleDriveClient, error) {
 	ctx := context.Background()
-	httpClient := cfg.Client(ctx, token)
+	var httpClient *http.Client
+
+	if cfg.ClientID == "" || cfg.ClientSecret == "" {
+		tokenSource := oauth2.StaticTokenSource(&oauth2.Token{
+			AccessToken:  driveAccessToken,
+			RefreshToken: driveRefreshToken,
+		})
+		httpClient = oauth2.NewClient(ctx, tokenSource)
+	} else {
+		httpClient = cfg.Client(ctx, token)
+	}
 
 	service, err := drive.NewService(ctx, option.WithHTTPClient(httpClient))
 	if err != nil {
@@ -55,7 +66,7 @@ func (g *GoogleDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta
 		filesReq.Q("trashed=false")
 
 		filesReq.Fields(
-			"files(id, mimeType, size,fileExtension)",
+			"files(id, mimeType, size,fileExtension, name)",
 		)
 
 		filesReq.Pages(ctx, func(page *drive.FileList) error {
@@ -72,10 +83,10 @@ func (g *GoogleDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta
 
 		for _, file := range files.Files {
 			objectChan <- &T.ObjectMeta{
-				Key:         file.Id,
+				Key:         file.Name,
 				Size:        file.Size,
 				ContentType: file.MimeType,
-				Ext: file.FileExtension,
+				Ext:         file.FileExtension,
 			}
 		}
 
@@ -93,7 +104,7 @@ func (g *GoogleDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta
 
 			for _, file := range files.Files {
 				objectChan <- &T.ObjectMeta{
-					Key:         file.Id,
+					Key:         file.Name,
 					Size:        file.Size,
 					ContentType: file.MimeType,
 				}
@@ -146,7 +157,7 @@ func (g *GoogleDriveClient) DownloadToFile(ctx context.Context, fileID string) (
 	}
 
 	zlogger.Logger.Info(fmt.Sprintf("Original File Name: %s", file.Name))
-	destinationPath := path.Join(g.workDir, file.Name )
+	destinationPath := path.Join(g.workDir, file.Name)
 
 	out, err := os.Create(destinationPath)
 	if err != nil {
@@ -194,4 +205,52 @@ func (g *GoogleDriveClient) DownloadToMemory(ctx context.Context, fileID string,
 	}
 
 	return data, nil
+}
+
+func generateLargeFile(filename string, size int64) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	data := make([]byte, 10*1024*1024) // 1MB chunk
+	for i := int64(0); i < size/(1024*1024); i++ {
+		_, err := file.Write(data)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (g *GoogleDriveClient) UploadFile(ctx context.Context) (*drive.File, error) {
+	filename := "large_10.txt"
+	_ = generateLargeFile(filename, 1024*1024*1024)
+
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, fmt.Errorf("unable to open file: %v", err)
+	}
+	defer file.Close()
+
+	if err != nil {
+		return nil, fmt.Errorf("unable to get file stats: %v", err)
+	}
+
+	driveFile := &drive.File{
+		Name:     filename,
+		MimeType: "text/plain",
+	}
+
+	createCall := g.service.Files.Create(driveFile).Media(file).ProgressUpdater(func(now, size int64) { fmt.Printf("%d, %d\r", now, size) })
+
+	res, err := createCall.Do()
+
+	if err != nil {
+		zlogger.Logger.Fatal(err)
+		return nil, err
+	}
+	return res, nil
 }

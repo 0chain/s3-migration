@@ -41,8 +41,8 @@ var (
 	chunkNumber                int
 	batchSize                  int
 	source                     string
-	clientId				   string
-	clientSecret 			   string
+	clientId                   string
+	clientSecret               string
 )
 
 // migrateCmd is the migrateFromS3 sub command to migrate whole objects from some buckets.
@@ -116,8 +116,8 @@ var migrateCmd = &cobra.Command{
 			}
 		}
 
-		if source == "" {
-			source = "s3"
+		if source == "" || (source != "google_drive" && source != "s3" && source != "dropbox" && source != "onedrive") {
+			source = "s3" // Default to "s3"
 		}
 
 		if (accessKey == "" || secretKey == "") && source == "s3" {
@@ -129,11 +129,6 @@ var migrateCmd = &cobra.Command{
 					return fmt.Errorf("empty access or secret key. Access Key:%v\tSecret Key: %v", accessKey, secretKey)
 				}
 			}
-		}
-		// check if client id and secret exist for google drive 
-
-		if (clientId == "" && clientSecret == "" && source=="google_drive") {
-			return fmt.Errorf("missing google client credentials")
 		}
 
 		if bucket == "" && source == "s3" {
@@ -245,7 +240,7 @@ var migrateCmd = &cobra.Command{
 			ChunkSize:       chunkSize,
 			ChunkNumber:     chunkNumber,
 			BatchSize:       batchSize,
-			Source:      source,
+			Source:          source,
 		}
 
 		if err := migration.InitMigration(&mConfig); err != nil {
