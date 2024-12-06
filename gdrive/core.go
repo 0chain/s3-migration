@@ -20,9 +20,11 @@ type GoogleDriveClient struct {
 	workDir string
 }
 
-func NewGoogleDriveClient(cfg oauth2.Config, token *oauth2.Token, workDir string) (*GoogleDriveClient, error) {
+func NewGoogleDriveClient(accessToken string, workDir string) (*GoogleDriveClient, error) {
 	ctx := context.Background()
-	httpClient := cfg.Client(ctx, token)
+	// httpClient := cfg.Client(ctx, token)
+	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: accessToken})
+	httpClient := oauth2.NewClient(ctx, tokenSource)
 
 	service, err := drive.NewService(ctx, option.WithHTTPClient(httpClient))
 	if err != nil {
@@ -55,7 +57,7 @@ func (g *GoogleDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta
 		filesReq.Q("trashed=false")
 
 		filesReq.Fields(
-			"files(id, mimeType, size,fileExtension)",
+			"files(id, mimeType, size,fileExtension, name)",
 		)
 
 		filesReq.Pages(ctx, func(page *drive.FileList) error {
@@ -72,10 +74,10 @@ func (g *GoogleDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta
 
 		for _, file := range files.Files {
 			objectChan <- &T.ObjectMeta{
-				Key:         file.Id,
+				Key:         file.Name,
 				Size:        file.Size,
 				ContentType: file.MimeType,
-				Ext: file.FileExtension,
+				Ext:         file.FileExtension,
 			}
 		}
 
@@ -93,7 +95,7 @@ func (g *GoogleDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta
 
 			for _, file := range files.Files {
 				objectChan <- &T.ObjectMeta{
-					Key:         file.Id,
+					Key:         file.Name,
 					Size:        file.Size,
 					ContentType: file.MimeType,
 				}
@@ -146,7 +148,7 @@ func (g *GoogleDriveClient) DownloadToFile(ctx context.Context, fileID string) (
 	}
 
 	zlogger.Logger.Info(fmt.Sprintf("Original File Name: %s", file.Name))
-	destinationPath := path.Join(g.workDir, file.Name )
+	destinationPath := path.Join(g.workDir, file.Name)
 
 	out, err := os.Create(destinationPath)
 	if err != nil {

@@ -17,7 +17,8 @@ import (
 	"github.com/0chain/s3migration/dropbox"
 	"github.com/0chain/s3migration/gdrive"
 	T "github.com/0chain/s3migration/types"
-	"golang.org/x/oauth2"
+
+	// "golang.org/x/oauth2"
 
 	"github.com/0chain/gosdk/zboxcore/sdk"
 	"github.com/0chain/gosdk/zboxcore/zboxutil"
@@ -145,25 +146,26 @@ func InitMigration(mConfig *MigrationConfig) error {
 		)
 	} else if mConfig.Source == "google_drive" {
 		// use client id instead of access token to prevent expiry time
-		ClientID, ClientSecret := util.GetClientCredentialsFromEnv()
-		cfg := oauth2.Config{
-			ClientID:     ClientID,
-			ClientSecret: ClientSecret,
-			Endpoint: oauth2.Endpoint{
-				AuthURL:       "https://accounts.google.com/o/oauth2/auth",
-				DeviceAuthURL: "https://oauth2.googleapis.com/device/code",
-				TokenURL:      "https://oauth2.googleapis.com/token",
-			},
-		}
+		// ClientID, ClientSecret := util.GetClientCredentialsFromEnv()
+		// cfg := oauth2.Config{
+		// 	ClientID:     ClientID,
+		// 	ClientSecret: ClientSecret,
+		// 	Endpoint: oauth2.Endpoint{
+		// 		AuthURL:       "https://accounts.google.com/o/oauth2/auth",
+		// 		DeviceAuthURL: "https://oauth2.googleapis.com/device/code",
+		// 		TokenURL:      "https://oauth2.googleapis.com/token",
+		// 	},
+		// }
 
-		token := &oauth2.Token{
-			AccessToken:  util.GetAccessKeyFromEnv(),
-			RefreshToken: util.GetRefreshKeyFromEnv(),
-		}
+		// token := &oauth2.Token{
+		// 	AccessToken:  util.GetAccessKeyFromEnv(),
+		// 	RefreshToken: util.GetRefreshKeyFromEnv(),
+		// }
 
 		dataSourceStore, err = gdrive.NewGoogleDriveClient(
-			cfg,
-			token,
+			util.GetAccessKeyFromEnv(),
+			// cfg,
+			// token,
 			mConfig.WorkDir,
 		)
 	} else {
@@ -290,12 +292,14 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 	defer close(totalObjChan)
 	go updateTotalObjects(totalObjChan, m.workDir)
 	objCh, errCh := migration.dataSourceStore.ListFiles(rootContext)
+
 	wg := &sync.WaitGroup{}
 	ops := make([]MigrationOperation, 0, m.batchSize)
 	var opLock sync.Mutex
 	currentSize := 0
 	opCtx, opCtxCancel := context.WithCancel(ctx)
 	for obj := range objCh {
+		zlogger.Logger.Info("====== Objects to be downloaded ::: ", obj)
 		zlogger.Logger.Info("Downloading object: ", obj.Key)
 		migrator.PauseDownload()
 		if migrator.IsMigrationError() {
