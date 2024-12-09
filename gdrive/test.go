@@ -196,7 +196,7 @@ func TestUploadFile(t *testing.T) {
 
 	ctx := context.Background()
 
-	file, err := client.UploadFile(ctx)
+	file, err := client.UploadFile(ctx, "largefile_1000.txt")
 
 	if err != nil {
 		zlogger.Logger.Info(fmt.Sprintf("error %v", err))

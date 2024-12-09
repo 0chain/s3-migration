@@ -225,8 +225,7 @@ func generateLargeFile(filename string, size int64) error {
 	return nil
 }
 
-func (g *GoogleDriveClient) UploadFile(ctx context.Context) (*drive.File, error) {
-	filename := "large_10.txt"
+func (g *GoogleDriveClient) UploadFile(ctx context.Context, filename string) (*drive.File, error) {
 	_ = generateLargeFile(filename, 1024*1024*1024)
 
 	file, err := os.Open(filename)
