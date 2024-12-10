@@ -107,8 +107,18 @@ func initDStorageSDK() {
 		os.Exit(1)
 	}
 
-	if err := client.InitSDK(clientConfig, cfg.BlockWorker, cfg.ChainID, cfg.SignatureScheme, 0, false, true); err != nil {
+	if err := client.InitSDK("{}", cfg.BlockWorker, cfg.ChainID, cfg.SignatureScheme, 0, false); err != nil {
 		panic(err)
+	}
+
+	err = zcncore.SetGeneralWalletInfo(clientConfig, cfg.SignatureScheme)
+	if err != nil {
+		fmt.Println("Error in sdk init", err)
+		os.Exit(1)
+	}
+
+	if client.GetClient().IsSplit {
+		zcncore.RegisterZauthServer(cfg.ZauthServer)
 	}
 
 	// additional settings depending network latency
