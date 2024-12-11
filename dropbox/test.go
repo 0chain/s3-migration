@@ -37,7 +37,7 @@ though we know with our hearts that she lies.
 `
 
 func TestDropboxClient_ListFiles(t *testing.T) {
-	client, err := GetDropboxClient(dropboxAccessToken, "./")
+	client, err := GetDropboxClient(dropboxAccessToken, "./", 0, 0)
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("Failed to create Dropbox client: %v", err))
 		return
@@ -58,7 +58,7 @@ func TestDropboxClient_ListFiles(t *testing.T) {
 }
 
 func TestDropboxClient_GetFileContent(t *testing.T) {
-	client, err := GetDropboxClient(dropboxAccessToken, "./")
+	client, err := GetDropboxClient(dropboxAccessToken, "./", 0, 0)
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("Failed to create Dropbox client: %v", err))
 	}
@@ -91,7 +91,7 @@ func TestDropboxClient_GetFileContent(t *testing.T) {
 }
 
 func TestDropboxClient_DeleteFile(t *testing.T) {
-	client, err := GetDropboxClient(dropboxAccessToken, "./")
+	client, err := GetDropboxClient(dropboxAccessToken, "./", 0, 0)
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("Failed to create Dropbox client: %v", err))
 		return
@@ -108,7 +108,7 @@ func TestDropboxClient_DeleteFile(t *testing.T) {
 }
 
 func TestDropboxClient_DownloadToFile(t *testing.T) {
-	client, err := GetDropboxClient(dropboxAccessToken, "./")
+	client, err := GetDropboxClient(dropboxAccessToken, "./", 0, 0)
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("Failed to create Dropbox client: %v", err))
 		return
@@ -125,7 +125,7 @@ func TestDropboxClient_DownloadToFile(t *testing.T) {
 }
 
 func TestDropboxClient_DownloadToMemory(t *testing.T) {
-	client, err := GetDropboxClient(dropboxAccessToken, "./")
+	client, err := GetDropboxClient(dropboxAccessToken, "./", 0, 0)
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("Failed to create Dropbox client: %v", err))
 		return

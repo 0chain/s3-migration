@@ -21,9 +21,11 @@ type DropboxClient struct {
 	workDir      string
 	dropboxConf  *dropbox.Config
 	dropboxFiles files.Client
+	newerThan    int64
+	olderThan    int64
 }
 
-func GetDropboxClient(token string, workDir string) (*DropboxClient, error) {
+func GetDropboxClient(token string, workDir string, newerThan, olderThan int64) (*DropboxClient, error) {
 	config := dropbox.Config{
 		Token: token,
 	}
@@ -44,6 +46,8 @@ func GetDropboxClient(token string, workDir string) (*DropboxClient, error) {
 		dropboxConf:  &config,
 		dropboxFiles: client,
 		workDir:      workDir,
+		newerThan:    newerThan,
+		olderThan:    olderThan,
 	}, nil
 }
 
@@ -70,11 +74,15 @@ func (d *DropboxClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta, <-
 
 		for _, entry := range res.Entries {
 			if meta, ok := entry.(*files.FileMetadata); ok {
-				objectChan <- &T.ObjectMeta{
-					Key:         meta.PathDisplay,
-					Size:        int64(meta.Size),
-					ContentType: mime.TypeByExtension(filepath.Ext(meta.PathDisplay)),
-					Ext:         filepath.Ext(meta.PathDisplay),
+				lastModified := meta.ClientModified.Unix()
+				if (d.newerThan == 0 || lastModified >= d.newerThan) &&
+					(d.olderThan == 0 || lastModified <= d.olderThan) {
+					objectChan <- &T.ObjectMeta{
+						Key:         meta.PathDisplay,
+						Size:        int64(meta.Size),
+						ContentType: mime.TypeByExtension(filepath.Ext(meta.PathDisplay)),
+						Ext:         filepath.Ext(meta.PathDisplay),
+					}
 				}
 			}
 		}

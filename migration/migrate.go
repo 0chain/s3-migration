@@ -142,6 +142,8 @@ func InitMigration(mConfig *MigrationConfig) error {
 		dataSourceStore, err = dropbox.GetDropboxClient(
 			util.GetAccessKeyFromEnv(),
 			mConfig.WorkDir,
+			mConfig.NewerThan.Unix(),
+			mConfig.OlderThan.Unix(),
 		)
 	} else if mConfig.Source == "google_drive" {
 		// use client id instead of access token to prevent expiry time
