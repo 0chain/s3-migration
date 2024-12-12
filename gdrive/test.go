@@ -186,22 +186,3 @@ func TestGoogleDriveClient_DownloadToMemory(t *testing.T) {
 
 	zlogger.Logger.Info(fmt.Sprintf("downloaded data: %s", data))
 }
-
-func TestUploadFile(t *testing.T) {
-	cfg, token := getOAuthConfig()
-	client, err := NewGoogleDriveClient(*cfg, token, "./")
-	if err != nil {
-		zlogger.Logger.Error(fmt.Sprintf("err while creating Google Drive client: %v", err))
-	}
-
-	ctx := context.Background()
-
-	file, err := client.UploadFile(ctx, "largefile_1000.txt")
-
-	if err != nil {
-		zlogger.Logger.Info(fmt.Sprintf("error %v", err))
-	}
-
-	zlogger.Logger.Info(file, "file")
-
-}
