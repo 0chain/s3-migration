@@ -83,7 +83,7 @@ func (g *GoogleDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta
 
 		for _, file := range files.Files {
 			objectChan <- &T.ObjectMeta{
-				Key:         file.Id,
+				Key:         file.Name,
 				Size:        file.Size,
 				ContentType: file.MimeType,
 				Ext:         file.FileExtension,
@@ -104,7 +104,7 @@ func (g *GoogleDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta
 
 			for _, file := range files.Files {
 				objectChan <- &T.ObjectMeta{
-					Key:         file.Id,
+					Key:         file.Name,
 					Size:        file.Size,
 					ContentType: file.MimeType,
 				}

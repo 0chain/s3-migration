@@ -480,7 +480,7 @@ func getUniqueShortObjKey(objectKey string) string {
 }
 
 func getRemotePath(objectKey string) string {
-	return filepath.Join(migration.migrateTo, migration.bucket, getUniqueShortObjKey(objectKey))
+	return path.Join(migration.migrateTo, migration.bucket, getUniqueShortObjKey(objectKey))
 }
 
 func checkIsFileExist(ctx context.Context, downloadObj *DownloadObjectMeta) error {

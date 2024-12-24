@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -97,11 +98,14 @@ func (d *DStorageService) Replace(ctx context.Context, remotePath string, r io.R
 }
 
 func (d *DStorageService) Upload(ctx context.Context, remotePath string, r io.Reader, size int64, contentType string, isUpdate bool) sdk.OperationRequest {
+	if !path.IsAbs(remotePath) {
+		fmt.Println("Remote path is not absolute", remotePath)
+	}
 	fileMeta := sdk.FileMeta{
-		RemotePath: filepath.Clean(remotePath),
+		RemotePath: path.Clean(remotePath),
 		ActualSize: size,
 		MimeType:   contentType,
-		RemoteName: filepath.Base(remotePath),
+		RemoteName: path.Base(remotePath),
 	}
 
 	opType := constants.FileOperationInsert
