@@ -14,7 +14,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.37
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.29.1
 	github.com/golang/mock v1.6.0
-	github.com/pewssh/onedrive v0.0.0-20241204163236-37fbf9472804
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.15.0
 	golang.org/x/oauth2 v0.23.0
@@ -51,6 +50,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.1 // indirect
 	github.com/hitenjain14/fasthttp v0.0.0-20240916135632-f9303a91736c // indirect
 	github.com/klauspost/compress v1.17.0 // indirect
+	github.com/pewssh/onedrive v0.0.0-20241224134620-3b06c57901d9 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.51.0 // indirect

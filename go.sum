@@ -433,6 +433,8 @@ github.com/pelletier/go-toml/v2 v2.0.6 h1:nrzqCb7j9cDFj2coyLNLaZuJTLjWjlaz6nvTvI
 github.com/pelletier/go-toml/v2 v2.0.6/go.mod h1:eumQOmlWiOPt5WriQQqoM5y18pDHwha2N+QD+EUNTek=
 github.com/pewssh/onedrive v0.0.0-20241204163236-37fbf9472804 h1:AFcxp5A3jSRkM8/LcEYDy8eKabDp41BmXOYDhQEhDpc=
 github.com/pewssh/onedrive v0.0.0-20241204163236-37fbf9472804/go.mod h1:hovAKXKMtSWf9/7nfMmFdfK7kc/gLkymFcg34uu0Wj0=
+github.com/pewssh/onedrive v0.0.0-20241224134620-3b06c57901d9 h1:Hl4Vtgcid3gjnBorzFRgDclDpmM6RsteCV55/c2m1wA=
+github.com/pewssh/onedrive v0.0.0-20241224134620-3b06c57901d9/go.mod h1:hovAKXKMtSWf9/7nfMmFdfK7kc/gLkymFcg34uu0Wj0=
 github.com/philhofer/fwd v1.1.1/go.mod h1:gk3iGcWd9+svBvR0sR+KPcfE+RNWozjowpeBVG3ZVNU=
 github.com/philhofer/fwd v1.1.2-0.20210722190033-5c56ac6d0bb9 h1:6ob53CVz+ja2i7easAStApZJlh7sxyq3Cm7g1Di6iqA=
 github.com/philhofer/fwd v1.1.2-0.20210722190033-5c56ac6d0bb9/go.mod h1:gk3iGcWd9+svBvR0sR+KPcfE+RNWozjowpeBVG3ZVNU=
