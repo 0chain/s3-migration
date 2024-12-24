@@ -175,7 +175,6 @@ func (g *GoogleDriveClient) DownloadToFile(ctx context.Context, fileID string) (
 	return destinationPath, nil
 }
 
-
 func (g *GoogleDriveClient) DownloadToMemory(ctx context.Context, fileID string, offset int64, chunkSize, fileSize int64) ([]byte, error) {
 	limit := offset + chunkSize - 1
 	if limit > fileSize {

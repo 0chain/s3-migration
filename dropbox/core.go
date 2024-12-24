@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"time"
 
 	T "github.com/0chain/s3migration/types"
 	"github.com/pkg/errors"
@@ -21,9 +22,11 @@ type DropboxClient struct {
 	workDir      string
 	dropboxConf  *dropbox.Config
 	dropboxFiles files.Client
+	newerThan    *time.Time
+	olderThan    *time.Time
 }
 
-func GetDropboxClient(token string, workDir string) (*DropboxClient, error) {
+func GetDropboxClient(token string, workDir string, newerThan *time.Time, olderThan *time.Time) (*DropboxClient, error) {
 	config := dropbox.Config{
 		Token: token,
 	}
@@ -70,11 +73,16 @@ func (d *DropboxClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta, <-
 
 		for _, entry := range res.Entries {
 			if meta, ok := entry.(*files.FileMetadata); ok {
-				objectChan <- &T.ObjectMeta{
-					Key:         meta.PathDisplay,
-					Size:        int64(meta.Size),
-					ContentType: mime.TypeByExtension(filepath.Ext(meta.PathDisplay)),
-					Ext:         filepath.Ext(meta.PathDisplay),
+				lastModified := meta.ClientModified
+
+				if (d.newerThan == nil || d.newerThan.Unix() == 0 || lastModified.Unix() >= d.newerThan.Unix()) &&
+					(d.newerThan.Unix() == 0 || d.newerThan.Unix() == 0 || lastModified.Unix() <= d.olderThan.Unix()) {
+					objectChan <- &T.ObjectMeta{
+						Key:         meta.PathDisplay,
+						Size:        int64(meta.Size),
+						ContentType: mime.TypeByExtension(filepath.Ext(meta.PathDisplay)),
+						Ext:         filepath.Ext(meta.PathDisplay),
+					}
 				}
 			}
 		}

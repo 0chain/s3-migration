@@ -13,7 +13,6 @@ var (
 	testFileID       = ""
 )
 
-
 func TestAzureClient_ListFiles(t *testing.T) {
 	client, err := NewAzureClient("testing", "climigration", connectionString)
 	if err != nil {

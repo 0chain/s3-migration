@@ -44,15 +44,15 @@ var (
 	clientId                   string
 	clientSecret               string
 	connectionString           string
-	accountName				   string
+	accountName                string
 )
 
-var azureCredentials = map[string] *string{
-	"connection string": & connectionString,
-	"account name":        &accountName,
+var azureCredentials = map[string]*string{
+	"connection string": &connectionString,
+	"account name":      &accountName,
 }
 
-var Credentials = map[string] *string{
+var Credentials = map[string]*string{
 	"access key": &accessKey,
 	"secret key": &secretKey,
 }
@@ -168,9 +168,8 @@ var migrateCmd = &cobra.Command{
 				return err
 			}
 		}
-		
 
-		if err := validateCredentials(func() map[string] *string {
+		if err := validateCredentials(func() map[string]*string {
 			if source == "azure" {
 				return azureCredentials
 			}
