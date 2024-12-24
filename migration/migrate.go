@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/0chain/s3migration/azure"
 	"github.com/0chain/s3migration/dropbox"
 	"github.com/0chain/s3migration/gdrive"
 	"github.com/0chain/s3migration/onedrive"
@@ -143,6 +144,8 @@ func InitMigration(mConfig *MigrationConfig) error {
 		dataSourceStore, err = dropbox.GetDropboxClient(
 			util.GetAccessKeyFromEnv(),
 			mConfig.WorkDir,
+			mConfig.NewerThan,
+			mConfig.OlderThan,
 		)
 	} else if mConfig.Source == "google_drive" {
 		// use client id instead of access token to prevent expiry time
@@ -176,6 +179,14 @@ func InitMigration(mConfig *MigrationConfig) error {
 		dataSourceStore, err = onedrive.NewOneDriveClient(
 			token,
 			mConfig.WorkDir,
+		)
+
+	} else if mConfig.Source == "azure" {
+		// use connectionString to make connection to azure storage account
+		dataSourceStore, err = azure.NewAzureClient(
+			mConfig.WorkDir,
+			*mConfig.AccountName,
+			*mConfig.ConnectionString,
 		)
 
 	} else {
@@ -471,7 +482,7 @@ func getUniqueShortObjKey(objectKey string) string {
 }
 
 func getRemotePath(objectKey string) string {
-	return filepath.Join(migration.migrateTo, migration.bucket, getUniqueShortObjKey(objectKey))
+	return path.Join(migration.migrateTo, migration.bucket, getUniqueShortObjKey(objectKey))
 }
 
 func checkIsFileExist(ctx context.Context, downloadObj *DownloadObjectMeta) error {

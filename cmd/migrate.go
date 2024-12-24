@@ -43,7 +43,34 @@ var (
 	source                     string
 	clientId                   string
 	clientSecret               string
+	connectionString           string
+	accountName                string
 )
+
+var azureCredentials = map[string]*string{
+	"connection string": &connectionString,
+	"account name":      &accountName,
+}
+
+var Credentials = map[string]*string{
+	"access key": &accessKey,
+	"secret key": &secretKey,
+}
+
+func validateCredentials(credentials map[string]*string) error {
+	missingFields := []string{}
+
+	for key, value := range credentials {
+		if *value == "" {
+			missingFields = append(missingFields, key)
+		}
+	}
+	if len(missingFields) > 0 {
+		return errors.New("Missing fields: " + strings.Join(missingFields, ", "))
+	}
+
+	return nil
+}
 
 // migrateCmd is the migrateFromS3 sub command to migrate whole objects from some buckets.
 func init() {
@@ -74,9 +101,13 @@ func init() {
 	migrateCmd.Flags().Int64Var(&chunkSize, "chunk-size", 50*1024*1024, "chunk size in bytes")
 	migrateCmd.Flags().IntVar(&chunkNumber, "chunk-number", 250, "number of chunks to upload")
 	migrateCmd.Flags().IntVar(&batchSize, "batch-size", 20, "number of files to upload in a batch")
-	migrateCmd.Flags().StringVar(&source, "source", "s3", "s3 or google_drive or dropbox")
+	migrateCmd.Flags().StringVar(&source, "source", "s3", "s3 or google_drive or dropbox or azure or google_cloud_storage")
 	migrateCmd.Flags().StringVar(&clientId, "client-id", "", "Client id for Google app console")
 	migrateCmd.Flags().StringVar(&clientSecret, "client-secret", "", "Client secret for Google app console")
+
+	// in case of azure it takes connectionString as param
+	migrateCmd.PersistentFlags().StringVar(&connectionString, "connection-string", "", "connection string for azure")
+	migrateCmd.PersistentFlags().StringVar(&accountName, "account-name", "", "account name for azure")
 }
 
 var migrateCmd = &cobra.Command{
@@ -116,7 +147,7 @@ var migrateCmd = &cobra.Command{
 			}
 		}
 
-		if source == "" || (source != "google_drive" && source != "s3" && source != "dropbox" && source != "onedrive") {
+		if source == "" || (source != "google_drive" && source != "s3" && source != "dropbox" && source != "onedrive" && source != "azure" && source != "google_cloud_storage") {
 			source = "s3" // Default to "s3"
 		}
 
@@ -130,17 +161,21 @@ var migrateCmd = &cobra.Command{
 				}
 			}
 		}
-		// check if client id and secret exist for google drive
-
-		if clientId == "" && clientSecret == "" && source == "google_drive" {
-			return fmt.Errorf("missing google client credentials")
-		}
 
 		if bucket == "" && source == "s3" {
 			bucket, region, prefix, err = util.GetBucketRegionPrefixFromFile(awsCredPath)
 			if err != nil {
 				return err
 			}
+		}
+
+		if err := validateCredentials(func() map[string]*string {
+			if source == "azure" {
+				return azureCredentials
+			}
+			return Credentials
+		}()); err != nil {
+			return err
 		}
 
 		if skip < 0 || skip > 2 {
