@@ -17,32 +17,6 @@ var (
 	clientSecret      = ""
 )
 
-// using: https://developers.google.com/oauthplayground
-
-// For reference (626 bytes text file)
-const TestFileContent = ` by Manuel Gutiérrez Nájera
-
-I want to die as the day declines, 
-at high sea and facing the sky, 
-while agony seems like a dream 
-and my soul like a bird that can fly. 
-
-To hear not, at this last moment, 
-once alone with sky and sea, 
-any more voices nor weeping prayers 
-than the majestic beating of the waves. 
-
-To die when the sad light retires 
-its golden network from the green waves 
-to be like the sun that slowly expires; 
-something very luminous that fades. 
-
-To die, and die young, before 
-fleeting time removes the gentle crown, 
-while life still says: "I'm yours" 
-though we know with our hearts that she lies. 
-`
-
 func getOAuthConfig() (*oauth2.Config, *oauth2.Token) {
 	cfg := &oauth2.Config{
 		ClientID:     clientId,
@@ -185,23 +159,4 @@ func TestGoogleDriveClient_DownloadToMemory(t *testing.T) {
 	}
 
 	zlogger.Logger.Info(fmt.Sprintf("downloaded data: %s", data))
-}
-
-func TestUploadFile(t *testing.T) {
-	cfg, token := getOAuthConfig()
-	client, err := NewGoogleDriveClient(*cfg, token, "./")
-	if err != nil {
-		zlogger.Logger.Error(fmt.Sprintf("err while creating Google Drive client: %v", err))
-	}
-
-	ctx := context.Background()
-
-	file, err := client.UploadFile(ctx)
-
-	if err != nil {
-		zlogger.Logger.Info(fmt.Sprintf("error %v", err))
-	}
-
-	zlogger.Logger.Info(file, "file")
-
 }

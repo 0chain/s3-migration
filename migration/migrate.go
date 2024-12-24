@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/0chain/s3migration/azure"
 	"github.com/0chain/s3migration/dropbox"
 	"github.com/0chain/s3migration/gdrive"
 	"github.com/0chain/s3migration/onedrive"
@@ -176,6 +177,14 @@ func InitMigration(mConfig *MigrationConfig) error {
 		dataSourceStore, err = onedrive.NewOneDriveClient(
 			token,
 			mConfig.WorkDir,
+		)
+
+	} else if mConfig.Source == "azure" {
+		// use connectionString to make connection to azure storage account
+		dataSourceStore, err = azure.NewAzureClient(
+			mConfig.WorkDir,
+			*mConfig.AccountName,
+			*mConfig.ConnectionString,
 		)
 
 	} else {

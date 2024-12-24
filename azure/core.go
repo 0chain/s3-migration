@@ -1,4 +1,4 @@
-package gdrive
+package azure
 
 import (
 	"context"
@@ -11,7 +11,6 @@ import (
 	zlogger "github.com/0chain/s3migration/logger"
 	T "github.com/0chain/s3migration/types"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
-	"golang.org/x/oauth2"
 )
 
 type AzureClient struct {
@@ -19,8 +18,7 @@ type AzureClient struct {
 	workDir string
 }
 
-func NewAzureClient(cfg oauth2.Config, token *oauth2.Token, workDir, accountName, connectionString string) (*AzureClient, error) {
-
+func NewAzureClient(workDir, accountName, connectionString string) (*AzureClient, error) {
 	blobURL := fmt.Sprintf("https://%s.blob.core.windows.net", accountName)
 	client, err := azblob.NewClientFromConnectionString(connectionString, &azblob.ClientOptions{Audience: blobURL})
 
