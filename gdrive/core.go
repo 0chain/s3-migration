@@ -148,7 +148,7 @@ func (g *GoogleDriveClient) DownloadToFile(ctx context.Context, fileID string) (
 	resp, err := g.service.Files.Get(fileID).Download()
 	if err != nil {
 		return "", err
-		
+
 	}
 	defer resp.Body.Close()
 
