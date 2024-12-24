@@ -20,7 +20,7 @@ var (
 )
 
 func TestOneDriveClient_ListFiles(t *testing.T) {
-	client, err := NewOneDriveClient(token, "./")
+	client, err := NewOneDriveClient(token, "./", nil, nil)
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("err while creating One Drive client: %v", err))
 		return
@@ -41,7 +41,7 @@ func TestOneDriveClient_ListFiles(t *testing.T) {
 }
 
 func TestOneDriveClient_GetFileContent(t *testing.T) {
-	client, err := NewOneDriveClient(token, "./")
+	client, err := NewOneDriveClient(token, "./", nil, nil)
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("Error while creating OneDrive client: %v", err))
 		return
@@ -67,7 +67,7 @@ func TestOneDriveClient_GetFileContent(t *testing.T) {
 }
 
 func TestOneDriveDeleteFile(t *testing.T) {
-	client, err := NewOneDriveClient(token, "./")
+	client, err := NewOneDriveClient(token, "./", nil, nil)
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("Error while creating OneDrive client: %v", err))
 		return
@@ -83,7 +83,7 @@ func TestOneDriveDeleteFile(t *testing.T) {
 }
 
 func TestOneDriveDownloadFile(t *testing.T) {
-	client, err := NewOneDriveClient(token, "./")
+	client, err := NewOneDriveClient(token, "./", nil, nil)
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("Error while creating OneDrive client: %v", err))
 		return
@@ -99,7 +99,7 @@ func TestOneDriveDownloadFile(t *testing.T) {
 }
 
 func TestOneDriveDownloadToMemory(t *testing.T) {
-	client, err := NewOneDriveClient(token, "./")
+	client, err := NewOneDriveClient(token, "./", nil, nil)
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("Error while creating OneDrive client: %v", err))
 		return

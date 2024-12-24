@@ -47,6 +47,8 @@ func GetDropboxClient(token string, workDir string, newerThan *time.Time, olderT
 		dropboxConf:  &config,
 		dropboxFiles: client,
 		workDir:      workDir,
+		newerThan:    newerThan,
+		olderThan:    olderThan,
 	}, nil
 }
 
@@ -76,7 +78,7 @@ func (d *DropboxClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta, <-
 				lastModified := meta.ClientModified
 
 				if (d.newerThan == nil || d.newerThan.Unix() == 0 || lastModified.Unix() >= d.newerThan.Unix()) &&
-					(d.newerThan.Unix() == 0 || d.newerThan.Unix() == 0 || lastModified.Unix() <= d.olderThan.Unix()) {
+					(d.olderThan == nil || d.olderThan.Unix() == 0 || lastModified.Unix() <= d.olderThan.Unix()) {
 					objectChan <- &T.ObjectMeta{
 						Key:         meta.PathDisplay,
 						Size:        int64(meta.Size),

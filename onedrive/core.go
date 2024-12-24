@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"time"
 
 	zlogger "github.com/0chain/s3migration/logger"
 	T "github.com/0chain/s3migration/types"
@@ -21,9 +22,11 @@ import (
 type OneDriveClient struct {
 	client  *drive.Client
 	workDir string
+	newerThan *time.Time
+	olderThan *time.Time
 }
 
-func NewOneDriveClient(token *oauth2.Token, workDir string) (*OneDriveClient, error) {
+func NewOneDriveClient(token *oauth2.Token, workDir string, newerThan *time.Time, olderThan *time.Time) (*OneDriveClient, error) {
 	ctx := context.Background()
 	ts := oauth2.StaticTokenSource(
 		token,
@@ -40,6 +43,8 @@ func NewOneDriveClient(token *oauth2.Token, workDir string) (*OneDriveClient, er
 	return &OneDriveClient{
 		client:  client,
 		workDir: workDir,
+		newerThan: newerThan,
+		olderThan: olderThan,
 	}, nil
 }
 
@@ -77,13 +82,22 @@ func (g *OneDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta, <
 			if entry.File != nil {
 				mimeType = entry.File.MIMEType
 			}
+			lastModified, err := time.Parse(time.RFC3339, entry.LastModified)
 
-			objectChan <- &T.ObjectMeta{
-				Key:         entry.Name,
-				Size:        entry.Size,
-				ContentType: mimeType,
-				Ext:         filepath.Ext(entry.DownloadURL),
-				Id:          &entry.Id,
+			if err != nil {
+				zlogger.Logger.Error(err)
+				continue
+			}
+			if (g.newerThan == nil || g.newerThan.Unix() == 0 || lastModified.Unix() >= g.newerThan.Unix()) &&
+				(g.olderThan == nil || g.olderThan.Unix() == 0 || lastModified.Unix() <= g.olderThan.Unix()) {
+			
+				objectChan <- &T.ObjectMeta{
+					Key:         entry.Name,
+					Size:        entry.Size,
+					ContentType: mimeType,
+					Ext:         filepath.Ext(entry.DownloadURL),
+					Id:          &entry.Id,
+				}
 			}
 		}
 	}()

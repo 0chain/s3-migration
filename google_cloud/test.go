@@ -16,6 +16,7 @@ var (
 	driveRefreshToken = ""
 	clientId          = ""
 	clientSecret      = ""
+	workDir = "0chainmigration"
 )
 
 func getOAuthConfig() (*oauth2.Config, *oauth2.Token) {
@@ -39,7 +40,7 @@ func getOAuthConfig() (*oauth2.Config, *oauth2.Token) {
 
 func TestGoogleCloudClient_ListFiles(t *testing.T) {
 	cfg, token := getOAuthConfig()
-	client, err := NewGoogleCloudClient(*cfg, token, "0chainmigration")
+	client, err := NewGoogleCloudClient(*cfg, token, workDir, nil, nil)
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("err while creating Google cloud client: %v", err))
 		return
@@ -61,7 +62,7 @@ func TestGoogleCloudClient_ListFiles(t *testing.T) {
 
 func TestGoogleCloudClient_GetFileContent(t *testing.T) {
 	cfg, token := getOAuthConfig()
-	client, err := NewGoogleCloudClient(*cfg, token, "0chainmigration")
+	client, err := NewGoogleCloudClient(*cfg, token, workDir, nil, nil)
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("Failed to creating Google Drive client: %v", err))
 		return
@@ -96,7 +97,7 @@ func TestGoogleCloudClient_GetFileContent(t *testing.T) {
 
 func TestGoogleCloudClient_DeleteFile(t *testing.T) {
 	cfg, token := getOAuthConfig()
-	client, err := NewGoogleCloudClient(*cfg, token, "0chainmigration")
+	client, err := NewGoogleCloudClient(*cfg, token, workDir, nil, nil)
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("err while creating Google Drive client: %v", err))
 		return
@@ -113,7 +114,7 @@ func TestGoogleCloudClient_DeleteFile(t *testing.T) {
 
 func TestGoogleCloudClient_DownloadToFile(t *testing.T) {
 	cfg, token := getOAuthConfig()
-	client, err := NewGoogleCloudClient(*cfg, token, "0chainmigration")
+	client, err := NewGoogleCloudClient(*cfg, token, workDir, nil, nil)
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("err while creating Google Drive client: %v", err))
 	}
@@ -130,7 +131,7 @@ func TestGoogleCloudClient_DownloadToFile(t *testing.T) {
 
 func TestGoogleCloudClient_DownloadToMemory(t *testing.T) {
 	cfg, token := getOAuthConfig()
-	client, err := NewGoogleCloudClient(*cfg, token, "0chainmigration")
+	client, err := NewGoogleCloudClient(*cfg, token, workDir, nil, nil)
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("err while creating Google Drive client: %v", err))
 	}

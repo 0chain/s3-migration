@@ -169,6 +169,8 @@ func InitMigration(mConfig *MigrationConfig) error {
 			cfg,
 			token,
 			mConfig.WorkDir,
+			mConfig.NewerThan,
+			mConfig.OlderThan,
 		)
 	} else if mConfig.Source == "onedrive" {
 		// use access token and refresh token to prevent expiry time
@@ -179,6 +181,8 @@ func InitMigration(mConfig *MigrationConfig) error {
 		dataSourceStore, err = onedrive.NewOneDriveClient(
 			token,
 			mConfig.WorkDir,
+			mConfig.NewerThan,
+			mConfig.OlderThan,
 		)
 
 	} else if mConfig.Source == "azure" {
@@ -187,6 +191,8 @@ func InitMigration(mConfig *MigrationConfig) error {
 			mConfig.WorkDir,
 			*mConfig.AccountName,
 			*mConfig.ConnectionString,
+			mConfig.NewerThan,
+			mConfig.OlderThan,
 		)
 
 	} else {

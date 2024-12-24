@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"time"
 
 	zlogger "github.com/0chain/s3migration/logger"
 	T "github.com/0chain/s3migration/types"
@@ -16,9 +17,11 @@ import (
 type AzureClient struct {
 	service *azblob.Client
 	workDir string
+	newerThan *time.Time
+	olderThan *time.Time
 }
 
-func NewAzureClient(workDir, accountName, connectionString string) (*AzureClient, error) {
+func NewAzureClient(workDir, accountName, connectionString string, newerThan *time.Time, olderThan *time.Time) (*AzureClient, error) {
 	blobURL := fmt.Sprintf("https://%s.blob.core.windows.net", accountName)
 	client, err := azblob.NewClientFromConnectionString(connectionString, &azblob.ClientOptions{Audience: blobURL})
 
@@ -29,6 +32,8 @@ func NewAzureClient(workDir, accountName, connectionString string) (*AzureClient
 	return &AzureClient{
 		service: client,
 		workDir: workDir,
+		newerThan: newerThan,
+		olderThan: olderThan,
 	}, nil
 }
 
@@ -57,12 +62,17 @@ func (g *AzureClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta, <-ch
 
 			for _, blob := range resp.Segment.BlobItems {
 				fmt.Println(*blob.Name)
+				lastModified := blob.Properties.LastModified
+				if (g.newerThan == nil || g.newerThan.Unix() == 0 || lastModified.Unix() >= g.newerThan.Unix()) &&
+				(g.olderThan == nil || g.olderThan.Unix() == 0 || lastModified.Unix() <= g.olderThan.Unix()) {
+			
 				objectChan <- &T.ObjectMeta{
 					Key:         *blob.Name,
 					Size:        *blob.Properties.ContentLength,
 					ContentType: *blob.Properties.ContentType,
 					Ext:         path.Ext(*blob.Name),
 				}
+			}
 			}
 		}
 

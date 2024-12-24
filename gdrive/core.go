@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"time"
 
 	zlogger "github.com/0chain/s3migration/logger"
 	T "github.com/0chain/s3migration/types"
@@ -19,9 +20,11 @@ import (
 type GoogleDriveClient struct {
 	service *drive.Service
 	workDir string
+	newerThan *time.Time
+	olderThan *time.Time
 }
 
-func NewGoogleDriveClient(cfg oauth2.Config, token *oauth2.Token, workDir string) (*GoogleDriveClient, error) {
+func NewGoogleDriveClient(cfg oauth2.Config, token *oauth2.Token, workDir string, newerThan *time.Time, olderThan *time.Time) (*GoogleDriveClient, error) {
 	ctx := context.Background()
 	var httpClient *http.Client
 
@@ -48,6 +51,8 @@ func NewGoogleDriveClient(cfg oauth2.Config, token *oauth2.Token, workDir string
 	return &GoogleDriveClient{
 		service: service,
 		workDir: workDir,
+		newerThan: newerThan,
+		olderThan: olderThan,
 	}, nil
 }
 
@@ -82,11 +87,21 @@ func (g *GoogleDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta
 		}
 
 		for _, file := range files.Files {
-			objectChan <- &T.ObjectMeta{
-				Key:         file.Name,
-				Size:        file.Size,
-				ContentType: file.MimeType,
-				Ext:         file.FileExtension,
+			lastModified, err := time.Parse(time.RFC3339, file.ModifiedTime)
+
+			if err != nil {
+				zlogger.Logger.Error(err)
+				continue
+			}
+
+			if (g.newerThan == nil || g.newerThan.Unix() == 0 || lastModified.Unix() >= g.newerThan.Unix()) &&
+				(g.olderThan == nil || g.olderThan.Unix() == 0 || lastModified.Unix() <= g.olderThan.Unix()) {
+				objectChan <- &T.ObjectMeta{
+					Key:         file.Name,
+					Size:        file.Size,
+					ContentType: file.MimeType,
+					Ext:         file.FileExtension,
+				}
 			}
 		}
 
