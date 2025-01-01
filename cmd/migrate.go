@@ -147,8 +147,21 @@ var migrateCmd = &cobra.Command{
 			}
 		}
 
-		if source == "" || (source != "google_drive" && source != "s3" && source != "dropbox" && source != "onedrive" && source != "azure" && source != "google_cloud_storage") {
-			source = "s3" // Default to "s3"
+		if source == "" {
+			source = "s3" // default
+		}
+
+		cloud_sources := map[string]bool{
+			"google_drive":         true,
+			"s3":                   true,
+			"dropbox":              true,
+			"onedrive":             true,
+			"azure":                true,
+			"google_cloud_storage": true,
+		}
+
+		if _, ok := cloud_sources[source]; !ok {
+			return errors.New("Invalid Source")
 		}
 
 		if (accessKey == "" || secretKey == "") && source == "s3" {
