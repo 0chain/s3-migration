@@ -161,7 +161,7 @@ var migrateCmd = &cobra.Command{
 		}
 
 		if _, ok := cloud_sources[source]; !ok {
-			return errors.New("Invalid Source")
+			return errors.New("invalid source. Supported sources: s3, google_drive, dropbox, onedrive, azure, google_cloud_storage")
 		}
 
 		if (accessKey == "" || secretKey == "") && source == "s3" {
