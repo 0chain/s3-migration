@@ -18,8 +18,8 @@ import (
 )
 
 type GoogleDriveClient struct {
-	service *drive.Service
-	workDir string
+	service   *drive.Service
+	workDir   string
 	newerThan *time.Time
 	olderThan *time.Time
 }
@@ -30,8 +30,8 @@ func NewGoogleDriveClient(cfg oauth2.Config, token *oauth2.Token, workDir string
 
 	if cfg.ClientID == "" || cfg.ClientSecret == "" {
 		tokenSource := oauth2.StaticTokenSource(&oauth2.Token{
-			AccessToken:  driveAccessToken,
-			RefreshToken: driveRefreshToken,
+			AccessToken:  token.AccessToken,
+			RefreshToken: token.RefreshToken,
 		})
 		httpClient = oauth2.NewClient(ctx, tokenSource)
 	} else {
@@ -49,8 +49,8 @@ func NewGoogleDriveClient(cfg oauth2.Config, token *oauth2.Token, workDir string
 	}
 
 	return &GoogleDriveClient{
-		service: service,
-		workDir: workDir,
+		service:   service,
+		workDir:   workDir,
 		newerThan: newerThan,
 		olderThan: olderThan,
 	}, nil
@@ -97,10 +97,11 @@ func (g *GoogleDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta
 			if (g.newerThan == nil || g.newerThan.Unix() == 0 || lastModified.Unix() >= g.newerThan.Unix()) &&
 				(g.olderThan == nil || g.olderThan.Unix() == 0 || lastModified.Unix() <= g.olderThan.Unix()) {
 				objectChan <- &T.ObjectMeta{
-					Key:         file.Name,
+					Key:         file.Id,
 					Size:        file.Size,
 					ContentType: file.MimeType,
 					Ext:         file.FileExtension,
+					Name:        &file.Name,
 				}
 			}
 		}
@@ -119,9 +120,11 @@ func (g *GoogleDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta
 
 			for _, file := range files.Files {
 				objectChan <- &T.ObjectMeta{
-					Key:         file.Name,
+					Key:         file.Id,
 					Size:        file.Size,
 					ContentType: file.MimeType,
+					Ext:         file.FileExtension,
+					Name:        &file.Name,
 				}
 			}
 
@@ -221,22 +224,4 @@ func (g *GoogleDriveClient) DownloadToMemory(ctx context.Context, fileID string,
 	}
 
 	return data, nil
-}
-
-func generateLargeFile(filename string, size int64) error {
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	data := make([]byte, 10*1024*1024) // 1MB chunk
-	for i := int64(0); i < size/(1024*1024); i++ {
-		_, err := file.Write(data)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }

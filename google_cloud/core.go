@@ -18,8 +18,8 @@ import (
 )
 
 type GoogleCloudClient struct {
-	service *storage.Client
-	workDir string
+	service   *storage.Client
+	workDir   string
 	newerThan *time.Time
 	olderThan *time.Time
 }
@@ -70,13 +70,13 @@ func (g *GoogleCloudClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta
 			lastModified := attrs.Updated
 			if (g.newerThan == nil || g.newerThan.Unix() == 0 || lastModified.Unix() >= g.newerThan.Unix()) &&
 				(g.olderThan == nil || g.olderThan.Unix() == 0 || lastModified.Unix() <= g.olderThan.Unix()) {
-			objectChan <- &T.ObjectMeta{
-				Key:         attrs.Name,
-				Size:        attrs.Size,
-				ContentType: attrs.ContentType,
-				Ext:         path.Ext(attrs.Name),
+				objectChan <- &T.ObjectMeta{
+					Key:         attrs.Name,
+					Size:        attrs.Size,
+					ContentType: attrs.ContentType,
+					Ext:         path.Ext(attrs.Name),
+				}
 			}
-		}
 		}
 
 	}()

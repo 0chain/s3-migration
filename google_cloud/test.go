@@ -16,7 +16,7 @@ var (
 	driveRefreshToken = ""
 	clientId          = ""
 	clientSecret      = ""
-	workDir = "0chainmigration"
+	workDir           = "0chainmigration"
 )
 
 func getOAuthConfig() (*oauth2.Config, *oauth2.Token) {

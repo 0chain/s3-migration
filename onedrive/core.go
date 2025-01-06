@@ -20,8 +20,8 @@ import (
 )
 
 type OneDriveClient struct {
-	client  *drive.Client
-	workDir string
+	client    *drive.Client
+	workDir   string
 	newerThan *time.Time
 	olderThan *time.Time
 }
@@ -41,8 +41,8 @@ func NewOneDriveClient(token *oauth2.Token, workDir string, newerThan *time.Time
 	}
 
 	return &OneDriveClient{
-		client:  client,
-		workDir: workDir,
+		client:    client,
+		workDir:   workDir,
 		newerThan: newerThan,
 		olderThan: olderThan,
 	}, nil
@@ -90,7 +90,7 @@ func (g *OneDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta, <
 			}
 			if (g.newerThan == nil || g.newerThan.Unix() == 0 || lastModified.Unix() >= g.newerThan.Unix()) &&
 				(g.olderThan == nil || g.olderThan.Unix() == 0 || lastModified.Unix() <= g.olderThan.Unix()) {
-			
+
 				objectChan <- &T.ObjectMeta{
 					Key:         entry.Name,
 					Size:        entry.Size,

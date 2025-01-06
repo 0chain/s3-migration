@@ -11,9 +11,8 @@ import (
 var (
 	connectionString = ""
 	testFileID       = ""
-	workDir = "testing"
-	accountName = "climigration"
-
+	workDir          = ""
+	accountName      = ""
 )
 
 func TestAzureClient_ListFiles(t *testing.T) {

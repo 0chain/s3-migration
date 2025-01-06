@@ -18,6 +18,7 @@ import (
 	"github.com/0chain/s3migration/dropbox"
 	"github.com/0chain/s3migration/gdrive"
 	"github.com/0chain/s3migration/onedrive"
+	"github.com/0chain/s3migration/types"
 	T "github.com/0chain/s3migration/types"
 	"golang.org/x/oauth2"
 
@@ -86,6 +87,7 @@ type Migration struct {
 	bucket        string
 	chunkSize     int64
 	batchSize     int
+	key           string
 }
 
 type MigrationOperation struct {
@@ -150,21 +152,31 @@ func InitMigration(mConfig *MigrationConfig) error {
 	} else if mConfig.Source == "google_drive" {
 		// use client id instead of access token to prevent expiry time
 		ClientID, ClientSecret := util.GetClientCredentialsFromEnv()
-		cfg := oauth2.Config{
-			ClientID:     ClientID,
-			ClientSecret: ClientSecret,
-			Endpoint: oauth2.Endpoint{
-				AuthURL:       "https://accounts.google.com/o/oauth2/auth",
-				DeviceAuthURL: "https://oauth2.googleapis.com/device/code",
-				TokenURL:      "https://oauth2.googleapis.com/token",
-			},
+		var cfg oauth2.Config
+		if ClientID != "" || ClientSecret != "" {
+			cfg = oauth2.Config{
+				ClientID:     ClientID,
+				ClientSecret: ClientSecret,
+				Endpoint: oauth2.Endpoint{
+					AuthURL:       "https://accounts.google.com/o/oauth2/auth",
+					DeviceAuthURL: "https://oauth2.googleapis.com/device/code",
+					TokenURL:      "https://oauth2.googleapis.com/token",
+				},
+			}
+		} else {
+			cfg = oauth2.Config{
+				Endpoint: oauth2.Endpoint{
+					AuthURL:       "https://accounts.google.com/o/oauth2/auth",
+					DeviceAuthURL: "https://oauth2.googleapis.com/device/code",
+					TokenURL:      "https://oauth2.googleapis.com/token",
+				},
+			}
 		}
 
 		token := &oauth2.Token{
 			AccessToken:  util.GetAccessKeyFromEnv(),
 			RefreshToken: util.GetRefreshKeyFromEnv(),
 		}
-
 		dataSourceStore, err = gdrive.NewGoogleDriveClient(
 			cfg,
 			token,
@@ -205,6 +217,10 @@ func InitMigration(mConfig *MigrationConfig) error {
 		zlogger.Logger.Error(err)
 		return err
 	}
+	key := "objectKey"
+	if mConfig.Source == "google_drive" {
+		key = "objectName"
+	}
 
 	migration = Migration{
 		zStore:          dStorageService,
@@ -220,6 +236,7 @@ func InitMigration(mConfig *MigrationConfig) error {
 		fs:              util.Fs,
 		chunkSize:       mConfig.ChunkSize,
 		batchSize:       mConfig.BatchSize,
+		key:             key,
 	}
 
 	rootContext, rootContextCancel = context.WithCancel(context.Background())
@@ -313,6 +330,17 @@ func StartMigration() error {
 	return err
 }
 
+func getValueBasedOnKey(key string, obj types.ObjectMeta) string {
+	if key == "objectKey" {
+		return obj.Key
+	} else if key == "objectName" {
+		if obj.Name != nil {
+			return *obj.Name
+		}
+	}
+	return ""
+}
+
 func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorker) {
 	defer migrator.CloseDownloadQueue()
 	totalObjChan := make(chan struct{}, 100)
@@ -345,8 +373,9 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 			currentSize = 0
 		}
 		currentSize++
+
 		downloadObjMeta := &DownloadObjectMeta{
-			ObjectKey: obj.Key,
+			ObjectKey: getValueBasedOnKey(migration.key, *obj),
 			Size:      obj.Size,
 			DoneChan:  make(chan struct{}, 1),
 			ErrChan:   make(chan error, 1),

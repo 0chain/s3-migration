@@ -15,8 +15,8 @@ import (
 )
 
 type AzureClient struct {
-	service *azblob.Client
-	workDir string
+	service   *azblob.Client
+	workDir   string
 	newerThan *time.Time
 	olderThan *time.Time
 }
@@ -30,8 +30,8 @@ func NewAzureClient(workDir, accountName, connectionString string, newerThan *ti
 	}
 
 	return &AzureClient{
-		service: client,
-		workDir: workDir,
+		service:   client,
+		workDir:   workDir,
 		newerThan: newerThan,
 		olderThan: olderThan,
 	}, nil
@@ -64,15 +64,15 @@ func (g *AzureClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta, <-ch
 				fmt.Println(*blob.Name)
 				lastModified := blob.Properties.LastModified
 				if (g.newerThan == nil || g.newerThan.Unix() == 0 || lastModified.Unix() >= g.newerThan.Unix()) &&
-				(g.olderThan == nil || g.olderThan.Unix() == 0 || lastModified.Unix() <= g.olderThan.Unix()) {
-			
-				objectChan <- &T.ObjectMeta{
-					Key:         *blob.Name,
-					Size:        *blob.Properties.ContentLength,
-					ContentType: *blob.Properties.ContentType,
-					Ext:         path.Ext(*blob.Name),
+					(g.olderThan == nil || g.olderThan.Unix() == 0 || lastModified.Unix() <= g.olderThan.Unix()) {
+
+					objectChan <- &T.ObjectMeta{
+						Key:         *blob.Name,
+						Size:        *blob.Properties.ContentLength,
+						ContentType: *blob.Properties.ContentType,
+						Ext:         path.Ext(*blob.Name),
+					}
 				}
-			}
 			}
 		}
 

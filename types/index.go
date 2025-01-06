@@ -18,6 +18,7 @@ type ObjectMeta struct {
 	ContentType string
 	Id          *string
 	Ext         string
+	Name        *string
 }
 
 type CloudStorageI interface {
