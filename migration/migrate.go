@@ -375,7 +375,8 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 		currentSize++
 
 		downloadObjMeta := &DownloadObjectMeta{
-			ObjectKey: getValueBasedOnKey(migration.key, *obj),
+			ObjectKey: obj.Key,
+			ObjectName: getValueBasedOnKey(migration.key, *obj),
 			Size:      obj.Size,
 			DoneChan:  make(chan struct{}, 1),
 			ErrChan:   make(chan error, 1),
@@ -384,7 +385,7 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 		wg.Add(1)
 		go func() {
 			defer func(start time.Time) {
-				zlogger.Logger.Info("downloadObjMeta key:  ", downloadObjMeta.ObjectKey, time.Since(start))
+				zlogger.Logger.Info("downloadObjMeta key:  ", downloadObjMeta.ObjectName, time.Since(start))
 			}(time.Now())
 
 			defer wg.Done()
@@ -395,7 +396,7 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 				return
 			}
 			if downloadObjMeta.IsFileAlreadyExist && migration.skip == Skip {
-				zlogger.Logger.Info("Skipping migration of object" + downloadObjMeta.ObjectKey)
+				zlogger.Logger.Info("Skipping migration of object" + downloadObjMeta.ObjectName)
 				migrator.DownloadStart(downloadObjMeta)
 				migrator.DownloadDone(downloadObjMeta, "", nil)
 				return
@@ -521,7 +522,7 @@ func getRemotePath(objectKey string) string {
 }
 
 func checkIsFileExist(ctx context.Context, downloadObj *DownloadObjectMeta) error {
-	remotePath := getRemotePath(downloadObj.ObjectKey)
+	remotePath := getRemotePath(downloadObj.ObjectName)
 
 	var isFileExist bool
 	err := util.Retry(3, time.Second*5, func() error {
@@ -551,10 +552,10 @@ func checkDownloadStatus(downloadObj *DownloadObjectMeta) error {
 func processOperation(ctx context.Context, downloadObj *DownloadObjectMeta) (MigrationOperation, error) {
 
 	defer func(start time.Time) {
-		zlogger.Logger.Info("uploading object key:  ", downloadObj.ObjectKey, time.Since(start))
+		zlogger.Logger.Info("uploading object key:  ", downloadObj.ObjectName, time.Since(start))
 	}(time.Now())
 
-	remotePath := getRemotePath(downloadObj.ObjectKey)
+	remotePath := getRemotePath(downloadObj.ObjectName)
 	var op MigrationOperation
 	fileObj, err := migration.fs.Open(downloadObj.LocalPath)
 	if err != nil {
@@ -568,21 +569,21 @@ func processOperation(ctx context.Context, downloadObj *DownloadObjectMeta) (Mig
 	}
 	mimeType, err := zboxutil.GetFileContentType(path.Ext(fileInfo.Name()), fileObj)
 	if err != nil {
-		zlogger.Logger.Error("content type error: ", err, " file: ", fileInfo.Name(), " objKey:", downloadObj.ObjectKey)
+		zlogger.Logger.Error("content type error: ", err, " file: ", fileInfo.Name(), " objKey:", downloadObj.ObjectName)
 		return op, err
 	}
 	var fileOperation sdk.OperationRequest
 	if downloadObj.IsFileAlreadyExist {
 		switch migration.skip {
 		case Replace:
-			zlogger.Logger.Info("Replacing object" + downloadObj.ObjectKey + " size " + strconv.FormatInt(downloadObj.Size, 10))
+			zlogger.Logger.Info("Replacing object" + downloadObj.ObjectName + " size " + strconv.FormatInt(downloadObj.Size, 10))
 			fileOperation = migration.zStore.Replace(ctx, remotePath, fileObj, downloadObj.Size, mimeType)
 		case Duplicate:
-			zlogger.Logger.Info("Duplicating object" + downloadObj.ObjectKey + " size " + strconv.FormatInt(downloadObj.Size, 10))
+			zlogger.Logger.Info("Duplicating object" + downloadObj.ObjectName + " size " + strconv.FormatInt(downloadObj.Size, 10))
 			fileOperation = migration.zStore.Duplicate(ctx, remotePath, fileObj, downloadObj.Size, mimeType)
 		}
 	} else {
-		zlogger.Logger.Info("Uploading object: " + downloadObj.ObjectKey + " size " + strconv.FormatInt(downloadObj.Size, 10))
+		zlogger.Logger.Info("Uploading object: " + downloadObj.ObjectName + " size " + strconv.FormatInt(downloadObj.Size, 10))
 		fileOperation = migration.zStore.Upload(ctx, remotePath, fileObj, downloadObj.Size, mimeType, false)
 	}
 	op.Operation = fileOperation
@@ -590,21 +591,21 @@ func processOperation(ctx context.Context, downloadObj *DownloadObjectMeta) (Mig
 }
 
 func processOperationForMemory(ctx context.Context, downloadObj *DownloadObjectMeta, r io.Reader) (MigrationOperation, error) {
-	remotePath := getRemotePath(downloadObj.ObjectKey)
+	remotePath := getRemotePath(downloadObj.ObjectName)
 	var op MigrationOperation
 	mimeType := downloadObj.mimeType
 	var fileOperation sdk.OperationRequest
 	if downloadObj.IsFileAlreadyExist {
 		switch migration.skip {
 		case Replace:
-			zlogger.Logger.Info("Replacing object" + downloadObj.ObjectKey + " size " + strconv.FormatInt(downloadObj.Size, 10))
+			zlogger.Logger.Info("Replacing object" + downloadObj.ObjectName + " size " + strconv.FormatInt(downloadObj.Size, 10))
 			fileOperation = migration.zStore.Replace(ctx, remotePath, r, downloadObj.Size, mimeType)
 		case Duplicate:
-			zlogger.Logger.Info("Duplicating object " + downloadObj.ObjectKey + " size " + strconv.FormatInt(downloadObj.Size, 10))
+			zlogger.Logger.Info("Duplicating object " + downloadObj.ObjectName + " size " + strconv.FormatInt(downloadObj.Size, 10))
 			fileOperation = migration.zStore.Duplicate(ctx, remotePath, r, downloadObj.Size, mimeType)
 		}
 	} else {
-		zlogger.Logger.Info("Uploading object: " + downloadObj.ObjectKey + " size " + strconv.FormatInt(downloadObj.Size, 10))
+		zlogger.Logger.Info("Uploading object: " + downloadObj.ObjectName + " size " + strconv.FormatInt(downloadObj.Size, 10))
 		fileOperation = migration.zStore.Upload(ctx, remotePath, r, downloadObj.Size, mimeType, false)
 	}
 	op.Operation = fileOperation
@@ -699,7 +700,7 @@ func (m *Migration) processMultiOperation(ctx context.Context, ops []MigrationOp
 	})
 	for _, op := range ops {
 		migrator.UploadDone(op.uploadObj, err)
-		zlogger.Logger.Info("upload done: ", op.uploadObj.ObjectKey, " size ", op.uploadObj.Size, err)
+		zlogger.Logger.Info("upload done for object key: ", op.uploadObj.ObjectKey, " size ", op.uploadObj.Size, err)
 	}
 	migrator.SetMigrationError(err)
 	return err

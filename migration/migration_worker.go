@@ -32,6 +32,7 @@ type MigrationWorker struct {
 
 type DownloadObjectMeta struct {
 	ObjectKey          string
+	ObjectName		   string
 	Size               int64
 	LocalPath          string
 	DoneChan           chan struct{}
@@ -138,7 +139,7 @@ func (m *MigrationWorker) PauseDownload() {
 }
 
 func (m *MigrationWorker) DownloadStart(d *DownloadObjectMeta) {
-	zlogger.Logger.Info("Started to download ", d.ObjectKey)
+	zlogger.Logger.Info("Started to download ", d.ObjectName)
 	m.incrDownloadConcurrency()
 	m.downloadQueue <- d
 	m.updateFileSizeOnDisk(d.Size)
@@ -150,11 +151,11 @@ func (m *MigrationWorker) DownloadDone(d *DownloadObjectMeta, localPath string, 
 	atomic.AddInt64(&m.currentDownloadSize, -d.Size)
 	if err != nil {
 		d.ErrChan <- err
-		zlogger.Logger.Error("Error while downloading ", d.ObjectKey, " Error: ", err)
+		zlogger.Logger.Error("Error while downloading ", d.ObjectName, " Error: ", err)
 	} else {
 		d.LocalPath = localPath
 		d.DoneChan <- struct{}{}
-		zlogger.Logger.Info("Downloaded ", d.ObjectKey)
+		zlogger.Logger.Info("Downloaded ", d.ObjectName)
 	}
 }
 
