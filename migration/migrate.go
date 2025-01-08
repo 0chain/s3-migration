@@ -17,6 +17,7 @@ import (
 	"github.com/0chain/s3migration/azure"
 	"github.com/0chain/s3migration/dropbox"
 	"github.com/0chain/s3migration/gdrive"
+	gcloud "github.com/0chain/s3migration/google_cloud"
 	"github.com/0chain/s3migration/onedrive"
 	"github.com/0chain/s3migration/types"
 	T "github.com/0chain/s3migration/types"
@@ -149,7 +150,7 @@ func InitMigration(mConfig *MigrationConfig) error {
 			mConfig.NewerThan,
 			mConfig.OlderThan,
 		)
-	} else if mConfig.Source == "google_drive" {
+	} else if mConfig.Source == "google_drive" || mConfig.Source == "google_cloud_storage" {
 		// use client id instead of access token to prevent expiry time
 		ClientID, ClientSecret := util.GetClientCredentialsFromEnv()
 		var cfg oauth2.Config
@@ -177,13 +178,17 @@ func InitMigration(mConfig *MigrationConfig) error {
 			AccessToken:  util.GetAccessKeyFromEnv(),
 			RefreshToken: util.GetRefreshKeyFromEnv(),
 		}
-		dataSourceStore, err = gdrive.NewGoogleDriveClient(
-			cfg,
-			token,
-			mConfig.WorkDir,
-			mConfig.NewerThan,
-			mConfig.OlderThan,
-		)
+		if mConfig.Source == "gdrive" {
+			dataSourceStore, err = gdrive.NewGoogleDriveClient(
+				cfg,
+				token,
+				mConfig.WorkDir,
+				mConfig.NewerThan,
+				mConfig.OlderThan,
+			)
+		} else {
+			dataSourceStore, err = gcloud.NewGoogleCloudClient(cfg, token, mConfig.WorkDir, mConfig.NewerThan, mConfig.OlderThan)
+		}
 	} else if mConfig.Source == "onedrive" {
 		// use access token and refresh token to prevent expiry time
 		token := &oauth2.Token{
