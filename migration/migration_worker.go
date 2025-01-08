@@ -32,7 +32,7 @@ type MigrationWorker struct {
 
 type DownloadObjectMeta struct {
 	ObjectKey          string
-	ObjectName		   string
+	ObjectName         string
 	Size               int64
 	LocalPath          string
 	DoneChan           chan struct{}

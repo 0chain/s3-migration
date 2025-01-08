@@ -59,6 +59,19 @@ func SetAwsEnvCredentials(accessKey, secretKey string) (err error) {
 	return os.Setenv("AWS_SECRET_ACCESS_KEY", secretKey)
 }
 
+func SetAzureCredentials(connectionString, accountName string) (err error) {
+	err = os.Setenv("CONNECTION_STRING", connectionString)
+
+	if err != nil {
+		return
+	}
+	return os.Setenv("ACCOUNT_NAME", accountName)
+}
+
+func GetAzureCredentials() (string, string) {
+	return os.Getenv("CONNECTION_STRING"), os.Getenv("ACCOUNT_NAME")
+}
+
 func SetClientCredentials(clientId, clientSecret string) (err error) {
 	err = os.Setenv("CLIENT_ID", clientId)
 	if err != nil {

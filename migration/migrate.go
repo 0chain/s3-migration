@@ -198,11 +198,11 @@ func InitMigration(mConfig *MigrationConfig) error {
 		)
 
 	} else if mConfig.Source == "azure" {
-		// use connectionString to make connection to azure storage account
+		connectionString, accountName := util.GetAzureCredentials()
 		dataSourceStore, err = azure.NewAzureClient(
 			mConfig.WorkDir,
-			*mConfig.AccountName,
-			*mConfig.ConnectionString,
+			accountName,
+			connectionString,
 			mConfig.NewerThan,
 			mConfig.OlderThan,
 		)
@@ -375,12 +375,12 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 		currentSize++
 
 		downloadObjMeta := &DownloadObjectMeta{
-			ObjectKey: obj.Key,
+			ObjectKey:  obj.Key,
 			ObjectName: getValueBasedOnKey(migration.key, *obj),
-			Size:      obj.Size,
-			DoneChan:  make(chan struct{}, 1),
-			ErrChan:   make(chan error, 1),
-			mimeType:  obj.ContentType,
+			Size:       obj.Size,
+			DoneChan:   make(chan struct{}, 1),
+			ErrChan:    make(chan error, 1),
+			mimeType:   obj.ContentType,
 		}
 		wg.Add(1)
 		go func() {

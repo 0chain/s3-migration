@@ -259,8 +259,15 @@ var migrateCmd = &cobra.Command{
 				startAfter = strings.ReplaceAll(strings.ReplaceAll(startAfter, " ", ""), "\n", "")
 			}
 		}
-		if err := util.SetAwsEnvCredentials(accessKey, secretKey); err != nil {
-			return err
+
+		if source == "s3" {
+			if err := util.SetAwsEnvCredentials(accessKey, secretKey); err != nil {
+				return err
+			}
+		} else if source == "azure" {
+			if err := util.SetAzureCredentials(connectionString, accountName); err != nil {
+				return err
+			}
 		}
 
 		if chunkNumber == 0 {
