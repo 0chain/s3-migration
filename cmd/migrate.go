@@ -45,11 +45,13 @@ var (
 	clientSecret               string
 	connectionString           string
 	accountName                string
+	containerName              string
 )
 
 var azureCredentials = map[string]*string{
 	"connection string": &connectionString,
 	"account name":      &accountName,
+	"container name":    &containerName,
 }
 
 var Credentials = map[string]*string{
@@ -108,6 +110,7 @@ func init() {
 	// in case of azure it takes connectionString as param
 	migrateCmd.PersistentFlags().StringVar(&connectionString, "connection-string", "", "connection string for azure")
 	migrateCmd.PersistentFlags().StringVar(&accountName, "account-name", "", "account name for azure")
+	migrateCmd.PersistentFlags().StringVar(&containerName, "container", "", "container name for azure")
 }
 
 var migrateCmd = &cobra.Command{
@@ -261,7 +264,7 @@ var migrateCmd = &cobra.Command{
 		}
 
 		if source == "azure" {
-			if err := util.SetAzureCredentials(connectionString, accountName); err != nil {
+			if err := util.SetAzureCredentials(connectionString, accountName, containerName); err != nil {
 				return err
 			}
 		} else {
@@ -306,6 +309,7 @@ var migrateCmd = &cobra.Command{
 		if err := migration.InitMigration(&mConfig); err != nil {
 			return err
 		}
+
 		err = migration.StartMigration()
 		if err != nil {
 			return err

@@ -10,9 +10,9 @@ import (
 )
 
 var (
-	refresh    = "REFRESH"
-	access     = "ACCESS"
-	testFileID = "FileId"
+	access     = "access"
+	refresh    = "refresh"
+	testFileID = "file_id"
 	token      = &oauth2.Token{
 		AccessToken:  access,
 		RefreshToken: refresh,
@@ -36,7 +36,7 @@ func TestOneDriveClient_ListFiles(t *testing.T) {
 	}()
 
 	for object := range objectChan {
-		zlogger.Logger.Info(fmt.Sprintf("file:%s, size: %d bytes, type: %s, id: %s", object.Key, object.Size, object.ContentType, object.Id))
+		zlogger.Logger.Info(fmt.Sprintf("file:%s, size: %d bytes, type: %s, id: %s", object.Key, object.Size, object.ContentType, *object.Id))
 	}
 }
 

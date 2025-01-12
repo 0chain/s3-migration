@@ -203,11 +203,12 @@ func InitMigration(mConfig *MigrationConfig) error {
 		)
 
 	} else if mConfig.Source == "azure" {
-		connectionString, accountName := util.GetAzureCredentials()
+		connectionString, accountName, containerName := util.GetAzureCredentials()
 		dataSourceStore, err = azure.NewAzureClient(
 			mConfig.WorkDir,
 			accountName,
 			connectionString,
+			containerName,
 			mConfig.NewerThan,
 			mConfig.OlderThan,
 		)
@@ -316,7 +317,6 @@ func StartMigration() error {
 	}
 
 	migrationWorker := NewMigrationWorker(migration.workDir)
-
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 	go func() {
@@ -389,7 +389,7 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 			currentSize = 0
 		}
 		currentSize++
-		zlogger.Logger.Info("Downlaodinga obhect ainfopr ", obj.Key, obj.Name, obj.Size)
+		zlogger.Logger.Info("Downlaodinga object info ", obj.Key, obj.Name, obj.Size)
 		downloadObjMeta := &DownloadObjectMeta{
 			ObjectKey:  getValueBasedOnKey("objectKey", migration.key, *obj),
 			ObjectName: getValueBasedOnKey("objectName", migration.key, *obj),

@@ -16,7 +16,7 @@ var (
 )
 
 func TestAzureClient_ListFiles(t *testing.T) {
-	client, err := NewAzureClient(workDir, accountName, connectionString, nil, nil)
+	client, err := NewAzureClient(workDir, accountName, connectionString, workDir, nil, nil)
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("err while creating Google Drive client: %v", err))
 		return
@@ -38,7 +38,7 @@ func TestAzureClient_ListFiles(t *testing.T) {
 }
 
 func TestAzureClient_GetFileContent(t *testing.T) {
-	client, err := NewAzureClient(workDir, accountName, connectionString, nil, nil)
+	client, err := NewAzureClient(workDir, accountName, connectionString, workDir, nil, nil)
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("Failed to creating Google Drive client: %v", err))
 		return
@@ -72,7 +72,7 @@ func TestAzureClient_GetFileContent(t *testing.T) {
 }
 
 func TestAzureClient_DeleteFile(t *testing.T) {
-	client, err := NewAzureClient(workDir, accountName, connectionString, nil, nil)
+	client, err := NewAzureClient(workDir, accountName, connectionString, workDir, nil, nil)
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("err while creating Google Drive client: %v", err))
 		return
@@ -89,7 +89,7 @@ func TestAzureClient_DeleteFile(t *testing.T) {
 }
 
 func TestAzureClient_DownloadToFile(t *testing.T) {
-	client, err := NewAzureClient(workDir, accountName, connectionString, nil, nil)
+	client, err := NewAzureClient(workDir, accountName, connectionString, workDir, nil, nil)
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("err while creating Google Drive client: %v", err))
 	}
@@ -105,7 +105,7 @@ func TestAzureClient_DownloadToFile(t *testing.T) {
 }
 
 func TestAzureClient_DownloadToMemory(t *testing.T) {
-	client, err := NewAzureClient(workDir, accountName, connectionString, nil, nil)
+	client, err := NewAzureClient(workDir, accountName, connectionString, workDir, nil, nil)
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("err while creating Google Drive client: %v", err))
 	}

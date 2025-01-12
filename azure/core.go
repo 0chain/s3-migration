@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path"
 	"time"
@@ -15,32 +14,44 @@ import (
 )
 
 type AzureClient struct {
-	service   *azblob.Client
-	workDir   string
-	newerThan *time.Time
-	olderThan *time.Time
+	service       *azblob.Client
+	workDir       string
+	newerThan     *time.Time
+	olderThan     *time.Time
+	containerName *string
 }
 
-func NewAzureClient(workDir, accountName, connectionString string, newerThan *time.Time, olderThan *time.Time) (*AzureClient, error) {
+func NewAzureClient(workDir, accountName, connectionString, containerName string, newerThan *time.Time, olderThan *time.Time) (*AzureClient, error) {
+	// Create the client
 	blobURL := fmt.Sprintf("https://%s.blob.core.windows.net", accountName)
-	client, err := azblob.NewClientFromConnectionString(connectionString, &azblob.ClientOptions{Audience: blobURL})
+	zlogger.Logger.Info("bloburl", blobURL, accountName)
 
+	client, err := azblob.NewClientFromConnectionString(connectionString, &azblob.ClientOptions{Audience: blobURL})
 	if err != nil {
-		log.Fatalf("failed to create blob client: %v", err)
+		return nil, fmt.Errorf("failed to create blob client: %v", err)
+	}
+	zlogger.Logger.Info("bloburl", blobURL)
+	pager := client.NewListContainersPager(&azblob.ListContainersOptions{})
+
+	_, err = pager.NextPage(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate client access: %v", err)
 	}
 
 	return &AzureClient{
-		service:   client,
-		workDir:   workDir,
-		newerThan: newerThan,
-		olderThan: olderThan,
+		service:       client,
+		workDir:       workDir,
+		newerThan:     newerThan,
+		olderThan:     olderThan,
+		containerName: &containerName,
 	}, nil
 }
-
 func (g *AzureClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta, <-chan error) {
 	objectChan := make(chan *T.ObjectMeta)
 	errChan := make(chan error)
-	containerName := g.workDir
+	containerName := g.containerName
+	zlogger.Logger.Info("wordk", containerName)
+	zlogger.Logger.Info("link", g.service.URL())
 
 	go func() {
 		defer func() {
@@ -48,14 +59,16 @@ func (g *AzureClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta, <-ch
 			close(errChan)
 		}()
 
-		pager := g.service.NewListBlobsFlatPager(containerName, &azblob.ListBlobsFlatOptions{
+		pager := g.service.NewListBlobsFlatPager(*containerName, &azblob.ListBlobsFlatOptions{
 			Include: azblob.ListBlobsInclude{Snapshots: true, Versions: true},
 		})
 
 		for pager.More() {
-			resp, err := pager.NextPage(context.TODO())
-
+			fmt.Println("Pager has more data:", pager.More())
+			resp, err := pager.NextPage(ctx)
+			zlogger.Logger.Info(resp, "respp__")
 			if err != nil {
+				zlogger.Logger.Error("Error fetching page", err)
 				errChan <- err
 				return
 			}
@@ -65,7 +78,7 @@ func (g *AzureClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta, <-ch
 				lastModified := blob.Properties.LastModified
 				if (g.newerThan == nil || g.newerThan.Unix() == 0 || lastModified.Unix() >= g.newerThan.Unix()) &&
 					(g.olderThan == nil || g.olderThan.Unix() == 0 || lastModified.Unix() <= g.olderThan.Unix()) {
-
+					fmt.Println("Pushing object to channel:", *blob.Name)
 					objectChan <- &T.ObjectMeta{
 						Key:         *blob.Name,
 						Size:        *blob.Properties.ContentLength,
