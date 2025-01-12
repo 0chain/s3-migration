@@ -18,7 +18,7 @@ type AzureClient struct {
 	workDir       string
 	newerThan     *time.Time
 	olderThan     *time.Time
-	containerName *string
+	containerName string
 }
 
 func NewAzureClient(workDir, accountName, connectionString, containerName string, newerThan *time.Time, olderThan *time.Time) (*AzureClient, error) {
@@ -43,30 +43,25 @@ func NewAzureClient(workDir, accountName, connectionString, containerName string
 		workDir:       workDir,
 		newerThan:     newerThan,
 		olderThan:     olderThan,
-		containerName: &containerName,
+		containerName: containerName,
 	}, nil
 }
 func (g *AzureClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta, <-chan error) {
 	objectChan := make(chan *T.ObjectMeta)
 	errChan := make(chan error)
-	containerName := g.containerName
-	zlogger.Logger.Info("wordk", containerName)
-	zlogger.Logger.Info("link", g.service.URL())
 
 	go func() {
 		defer func() {
 			close(objectChan)
 			close(errChan)
 		}()
-
-		pager := g.service.NewListBlobsFlatPager(*containerName, &azblob.ListBlobsFlatOptions{
+		pager := g.service.NewListBlobsFlatPager(g.containerName, &azblob.ListBlobsFlatOptions{
 			Include: azblob.ListBlobsInclude{Snapshots: true, Versions: true},
 		})
 
 		for pager.More() {
 			fmt.Println("Pager has more data:", pager.More())
 			resp, err := pager.NextPage(ctx)
-			zlogger.Logger.Info(resp, "respp__")
 			if err != nil {
 				zlogger.Logger.Error("Error fetching page", err)
 				errChan <- err
@@ -95,7 +90,7 @@ func (g *AzureClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta, <-ch
 }
 
 func (g *AzureClient) GetFileContent(ctx context.Context, fileID string) (*T.Object, error) {
-	resp, err := g.service.DownloadStream(ctx, g.workDir, fileID, nil)
+	resp, err := g.service.DownloadStream(ctx, g.containerName, fileID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +105,7 @@ func (g *AzureClient) GetFileContent(ctx context.Context, fileID string) (*T.Obj
 }
 
 func (g *AzureClient) DeleteFile(ctx context.Context, fileID string) error {
-	_, err := g.service.DeleteBlob(ctx, g.workDir, fileID, nil)
+	_, err := g.service.DeleteBlob(ctx, g.containerName, fileID, nil)
 	if err != nil {
 		return err
 	}
@@ -118,7 +113,7 @@ func (g *AzureClient) DeleteFile(ctx context.Context, fileID string) error {
 }
 
 func (g *AzureClient) DownloadToFile(ctx context.Context, fileID string) (string, error) {
-	resp, err := g.service.DownloadStream(ctx, g.workDir, fileID, nil)
+	resp, err := g.service.DownloadStream(ctx, g.containerName, fileID, nil)
 	if err != nil {
 		return "", err
 	}
@@ -148,7 +143,7 @@ func (g *AzureClient) DownloadToMemory(ctx context.Context, fileID string, offse
 		limit = fileSize
 	}
 
-	resp, err := g.service.DownloadStream(ctx, g.workDir, fileID, &azblob.DownloadStreamOptions{
+	resp, err := g.service.DownloadStream(ctx, g.containerName, fileID, &azblob.DownloadStreamOptions{
 		Range: azblob.HTTPRange{ // Pass by value, no `&` needed here
 			Offset: offset,
 			Count:  chunkSize,
