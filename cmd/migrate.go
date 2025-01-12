@@ -260,12 +260,12 @@ var migrateCmd = &cobra.Command{
 			}
 		}
 
-		if source == "s3" {
-			if err := util.SetAwsEnvCredentials(accessKey, secretKey); err != nil {
+		if source == "azure" {
+			if err := util.SetAzureCredentials(connectionString, accountName); err != nil {
 				return err
 			}
-		} else if source == "azure" {
-			if err := util.SetAzureCredentials(connectionString, accountName); err != nil {
+		} else {
+			if err := util.SetAwsEnvCredentials(accessKey, secretKey); err != nil {
 				return err
 			}
 		}

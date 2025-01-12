@@ -226,6 +226,9 @@ func InitMigration(mConfig *MigrationConfig) error {
 	if mConfig.Source == "google_drive" {
 		key = "objectName"
 	}
+	if mConfig.Source == "onedrive" {
+		key = "Id"
+	}
 
 	migration = Migration{
 		zStore:          dStorageService,
@@ -335,12 +338,20 @@ func StartMigration() error {
 	return err
 }
 
-func getValueBasedOnKey(key string, obj types.ObjectMeta) string {
-	if key == "objectKey" {
-		return obj.Key
-	} else if key == "objectName" {
-		if obj.Name != nil {
-			return *obj.Name
+func getValueBasedOnKey(field_name string, key string, obj types.ObjectMeta) string {
+	if field_name == "objectName" {
+		if key == "objectKey" {
+			return obj.Key
+		} else if key == "objectName" {
+			if obj.Name != nil {
+				return *obj.Name
+			}
+		}
+	} else if field_name == "objectKey" {
+		if key == "Id" {
+			return *obj.Id
+		} else {
+			return obj.Key
 		}
 	}
 	return ""
@@ -378,10 +389,10 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 			currentSize = 0
 		}
 		currentSize++
-
+		zlogger.Logger.Info("Downlaodinga obhect ainfopr ", obj.Key, obj.Name, obj.Size)
 		downloadObjMeta := &DownloadObjectMeta{
-			ObjectKey:  obj.Key,
-			ObjectName: getValueBasedOnKey(migration.key, *obj),
+			ObjectKey:  getValueBasedOnKey("objectKey", migration.key, *obj),
+			ObjectName: getValueBasedOnKey("objectName", migration.key, *obj),
 			Size:       obj.Size,
 			DoneChan:   make(chan struct{}, 1),
 			ErrChan:    make(chan error, 1),
@@ -715,6 +726,7 @@ func (m *Migration) processChunkDownload(ctx context.Context, sw *util.StreamWri
 	// chunk download and pipe data
 
 	migrator.DownloadStart(downloadObjMeta)
+	zlogger.Logger.Info("Downloading object: ", downloadObjMeta.ObjectName)
 	offset := 0
 	chunkSize := int(m.chunkSize)
 	acceptedChunkSize := int(m.zStore.GetChunkWriteSize())
