@@ -38,15 +38,11 @@ func NewGoogleCloudClient(cfg oauth2.Config, token *oauth2.Token, workDir string
 		return nil, fmt.Errorf("failed to create storage client: %v", err)
 	}
 
-	it := client.Buckets(ctx, "")
-
+	it := client.Bucket(workDir).Objects(ctx, nil)
 	_, err = it.Next()
-	if err != nil {
+	if err != nil && err != iterator.Done {
 		client.Close()
-		if err == iterator.Done {
-			return nil, fmt.Errorf("no accessible buckets found with current credentials")
-		}
-		return nil, fmt.Errorf("failed to validate client access: %v", err)
+		return nil, fmt.Errorf("invalid client token: %v", err)
 	}
 
 	return &GoogleCloudClient{
