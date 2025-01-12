@@ -75,10 +75,11 @@ func (g *OneDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta, <
 			return
 		}
 		for _, entry := range filesRes.DriveItems {
-			// Safely access the MIME type
 			mimeType := "None"
 
-			// Check if the File field is not nil
+			if entry.Size == 0 {
+				continue
+			}
 			if entry.File != nil {
 				mimeType = entry.File.MIMEType
 			}

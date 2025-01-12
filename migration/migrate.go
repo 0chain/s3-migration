@@ -340,7 +340,7 @@ func StartMigration() error {
 
 func getValueBasedOnKey(field_name string, key string, obj types.ObjectMeta) string {
 	if field_name == "objectName" {
-		if key == "objectKey" {
+		if key == "objectKey" || key == "Id" {
 			return obj.Key
 		} else if key == "objectName" {
 			if obj.Name != nil {
