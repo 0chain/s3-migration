@@ -178,7 +178,7 @@ func InitMigration(mConfig *MigrationConfig) error {
 			AccessToken:  util.GetAccessKeyFromEnv(),
 			RefreshToken: util.GetRefreshKeyFromEnv(),
 		}
-		if mConfig.Source == "gdrive" {
+		if mConfig.Source == "google_drive" {
 			dataSourceStore, err = gdrive.NewGoogleDriveClient(
 				cfg,
 				token,
