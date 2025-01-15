@@ -82,10 +82,21 @@ func initConfig() {
 	// syncing loggers
 	logger.SyncLoggers([]*logger.Logger{zcncore.GetLogger(), sdk.GetLogger()})
 
-	// set the log file
-	zcncore.SetLogFile("cmdlog.log", !bSilent)
-	sdk.SetLogFile("cmdlog.log", !bSilent)
-	zlogger.SetLogFile("s3migration.log", !bSilent)
+	exePath, err := os.Executable()
+	if err != nil {
+		fmt.Printf("Error getting executable path: %v\n", err)
+		return
+	}
+
+	exeDir := filepath.Dir(exePath)
+
+	cmdLogFilePath := filepath.Join(exeDir, "cmdlog.log")
+	s3MigrationLogFilePath := filepath.Join(exeDir, "s3migration.log")
+
+
+	zcncore.SetLogFile(cmdLogFilePath, !bSilent)
+	sdk.SetLogFile(s3MigrationLogFilePath, !bSilent)
+	zlogger.SetLogFile(s3MigrationLogFilePath, !bSilent)
 
 	err = client.Init(context.Background(), conf.Config{
 		ChainID:         cfg.ChainID,
