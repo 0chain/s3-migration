@@ -368,6 +368,12 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 	var opLock sync.Mutex
 	currentSize := 0
 	opCtx, opCtxCancel := context.WithCancel(ctx)
+	var files_count = 0
+	for range objCh {
+		files_count++
+	}
+	zlogger.Logger.Info("Total files count existing in cloud service to transfer", files_count)
+
 	for obj := range objCh {
 		zlogger.Logger.Info("Downloading object: ", obj.Key)
 		migrator.PauseDownload()
@@ -389,7 +395,7 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 			currentSize = 0
 		}
 		currentSize++
-		zlogger.Logger.Info("Downlaodinga object info ", obj.Key, obj.Name, obj.Size)
+		zlogger.Logger.Info("Downloding object info ", obj.Key, obj.Name, obj.Size)
 		downloadObjMeta := &DownloadObjectMeta{
 			ObjectKey:  getValueBasedOnKey("objectKey", migration.key, *obj),
 			ObjectName: getValueBasedOnKey("objectName", migration.key, *obj),
@@ -428,6 +434,7 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 			opLock.Unlock()
 		}()
 	}
+
 	if currentSize > 0 {
 		wg.Wait()
 		processOps := ops
