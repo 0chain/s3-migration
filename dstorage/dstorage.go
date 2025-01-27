@@ -15,7 +15,7 @@ import (
 	"github.com/0chain/s3migration/util"
 	zerror "github.com/0chain/s3migration/zErrors"
 
-	"github.com/0chain/gosdk/constants"
+	"github.com/0chain/gosdk_common/constants"
 	"github.com/0chain/gosdk/zboxcore/sdk"
 )
 
