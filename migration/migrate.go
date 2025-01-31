@@ -333,7 +333,7 @@ func StartMigration() error {
 	if err != nil {
 		zlogger.Logger.Error("Error while migration, err", err)
 	}
-	zlogger.Logger.Info("Total migrated objects: ", migration.totalMigratedObjects)
+	zlogger.Logger.Info("Total migrated objects :: ", migration.totalMigratedObjects)
 	zlogger.Logger.Info("Total migrated size: ", migration.migratedSize)
 	return err
 }
@@ -369,13 +369,9 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 	currentSize := 0
 	opCtx, opCtxCancel := context.WithCancel(ctx)
 	var files_count = 0
-	for range objCh {
-		files_count++
-	}
-	zlogger.Logger.Info("Total files count existing in cloud service to transfer", files_count)
-
 	for obj := range objCh {
 		zlogger.Logger.Info("Downloading object: ", obj.Key)
+		files_count++
 		migrator.PauseDownload()
 		if migrator.IsMigrationError() {
 			opCtxCancel()
@@ -435,6 +431,7 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 		}()
 	}
 
+	zlogger.Logger.Info("Total files ::", files_count)
 	if currentSize > 0 {
 		wg.Wait()
 		processOps := ops
