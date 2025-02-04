@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/0chain/gosdk_common/core/client"
+	"github.com/0chain/gosdk_common/zboxcore/commonsdk"
 
 	"github.com/0chain/gosdk_common/core/conf"
 	"github.com/0chain/gosdk_common/core/logger"
@@ -80,8 +81,7 @@ func initConfig() {
 	}
 
 	// syncing loggers
-	logger.SyncLoggers([]*logger.Logger{zcncore.GetLogger(), sdk.GetLogger()})
-
+	logger.SyncLoggers([]*logger.Logger{zcncore.GetLogger(), commonsdk.GetLogger()})
 	exePath, err := os.Executable()
 	if err != nil {
 		fmt.Printf("Error getting executable path: %v\n", err)
@@ -94,7 +94,7 @@ func initConfig() {
 	// get parent of workDir
 	parentDir := filepath.Dir(workDir)
 	s3MigrationLogFilePath := filepath.Join(parentDir, "s3migration.log")
-	sdk.SetLogFile(s3MigrationLogFilePath, !bSilent)
+	commonsdk.SetLogFile(s3MigrationLogFilePath, !bSilent)
 	zlogger.SetLogFile(s3MigrationLogFilePath, !bSilent)
 	// log workdir
 	fmt.Println("Workdir: ", workDir)

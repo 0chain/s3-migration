@@ -10,7 +10,7 @@ require (
 	github.com/0chain/gosdk v1.19.4
 	github.com/0chain/onedrive v1.1.1
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.4.1
-	github.com/0chain/gosdk_common v0.0.0-20250124074147-1da9c7e420af
+	github.com/0chain/gosdk_common v0.0.0-20250204070817-3c82b7ad6a9f
 	github.com/aws/aws-sdk-go-v2 v1.17.1
 	github.com/aws/aws-sdk-go-v2/config v1.17.10
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.37
@@ -156,4 +156,4 @@ require (
 
 replace github.com/herumi/bls-go-binary => github.com/boddumanohar/bls-go-binary v1.30.8
 
-replace github.com/0chain/gosdk => github.com/0chain/egosdk v1.18.6-0.20250124075303-29a8e71af584
+replace github.com/0chain/gosdk => github.com/0chain/egosdk v1.18.6-0.20250204071300-93191f4aa124
