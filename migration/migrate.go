@@ -41,7 +41,6 @@ const (
 
 const (
 	uploadCountFileName = "upload.count"
-	totalFilesToUpload  = "files.total"
 	sourceDeleteFailed  = "source_delete.failed"
 )
 
@@ -311,8 +310,9 @@ func StartMigration() error {
 	}(time.Now())
 	migration.startTime = time.Now()
 
-	if _, err := os.Stat(filepath.Join(migration.workDir, "migration_time.txt")); err == nil {
-		if err := os.Remove(filepath.Join(migration.workDir, "migration_time.txt")); err != nil {
+	migrationTimeFilePath := filepath.Join("migration_time.txt")
+	if _, err := os.Stat(migrationTimeFilePath); err == nil {
+		if err := os.Remove(migrationTimeFilePath); err != nil {
 			zlogger.Logger.Error("Failed to remove migration_time.txt file: ", err)
 		}
 	}
@@ -344,6 +344,19 @@ func StartMigration() error {
 	}
 	zlogger.Logger.Info("Total migrated objects :: ", migration.totalMigratedObjects)
 	zlogger.Logger.Info("Total migrated size: ", migration.migratedSize)
+
+	if err := os.Remove(filepath.Join("files.count")); err != nil {
+		zlogger.Logger.Error("Failed to remove files.count file: ", err)
+	}
+	if err := os.Remove(filepath.Join("upload.count")); err != nil {
+		zlogger.Logger.Error("Failed to remove upload.count file: ", err)
+	}
+	if err := os.Remove(migration.stateFilePath); err != nil {
+		zlogger.Logger.Error("Failed to remove state file: ", err)
+	}
+	if err := os.Remove(filepath.Join("migration_time.txt")); err != nil {
+		zlogger.Logger.Error("Failed to remove migration_time.txt file: ", err)
+	}
 	return err
 }
 
@@ -696,16 +709,12 @@ func (m *Migration) UpdateStateFile(migrateHandler *MigrationWorker) {
 		select {
 		case <-u.DoneChan:
 			updateState(u.ObjectKey)
-			zlogger.Logger.Info("Migration sdd: ", migration.startTime)
-
 			if totalMigrated == 0 {
-				zlogger.Logger.Info("Migration started at: ", migration.startTime)
-				migration.endTime = time.Now()
-				os.WriteFile(filepath.Join("migration_time.txt"), []byte(migration.endTime.Sub(migration.startTime).String()), 0644)
+				elapsedTime := migration.endTime.Sub(migration.startTime)
+				os.WriteFile(filepath.Join("migration_time.txt"), []byte(fmt.Sprintf("%v", elapsedTime)), 0644)
 			}
 			totalMigrated++
 			updateMigratedFile(strconv.Itoa(totalMigrated))
-
 		case <-u.ErrChan:
 			return
 		}
