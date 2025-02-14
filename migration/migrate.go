@@ -41,6 +41,7 @@ const (
 
 const (
 	uploadCountFileName = "upload.count"
+	totalFilesToUpload  = "files.total"
 	sourceDeleteFailed  = "source_delete.failed"
 )
 
@@ -431,7 +432,19 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 		}()
 	}
 
-	zlogger.Logger.Info("Total files ::", files_count)
+	go func() {
+		f, err := os.Create(filepath.Join("files.count"))
+		if err != nil {
+			zlogger.Logger.Error(err)
+			return
+		}
+		defer f.Close()
+		_, err = f.WriteString(strconv.Itoa(files_count))
+		if err != nil {
+			zlogger.Logger.Error(err)
+		}
+	}()
+
 	if currentSize > 0 {
 		wg.Wait()
 		processOps := ops
@@ -657,7 +670,9 @@ func (m *Migration) UpdateStateFile(migrateHandler *MigrationWorker) {
 	}
 	defer closeStateFile()
 
-	updateMigratedFile, closeMigratedFile, err := updateKeyFunc(filepath.Join(migration.workDir, uploadCountFileName))
+	// write for file to be uploaded
+
+	updateMigratedFile, closeMigratedFile, err := updateKeyFunc(filepath.Join(uploadCountFileName))
 	if err != nil {
 		zlogger.Logger.Error(err)
 		migrateHandler.SetMigrationError(err)
