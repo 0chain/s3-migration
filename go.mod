@@ -52,6 +52,7 @@ require (
 	github.com/klauspost/compress v1.17.0 // indirect
 	github.com/pewssh/onedrive v0.0.0-20241224134620-3b06c57901d9 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
+	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.51.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
