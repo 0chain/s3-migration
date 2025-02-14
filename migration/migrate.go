@@ -90,6 +90,8 @@ type Migration struct {
 	chunkSize     int64
 	batchSize     int
 	key           string
+	startTime     time.Time
+	endTime       time.Time
 }
 
 type MigrationOperation struct {
@@ -307,7 +309,13 @@ func StartMigration() error {
 	defer func(start time.Time) {
 		zlogger.Logger.Info("time taken: ", time.Since(start))
 	}(time.Now())
+	migration.startTime = time.Now()
 
+	if _, err := os.Stat(filepath.Join(migration.workDir, "migration_time.txt")); err == nil {
+		if err := os.Remove(filepath.Join(migration.workDir, "migration_time.txt")); err != nil {
+			zlogger.Logger.Error("Failed to remove migration_time.txt file: ", err)
+		}
+	}
 	if migration.deleteSource {
 		f, err := os.Create(filepath.Join(migration.workDir, sourceDeleteFailed))
 		if err != nil {
@@ -370,9 +378,11 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 	currentSize := 0
 	opCtx, opCtxCancel := context.WithCancel(ctx)
 	var files_count = 0
+	var totalSize int64
 	for obj := range objCh {
 		zlogger.Logger.Info("Downloading object: ", obj.Key)
 		files_count++
+		totalSize += obj.Size
 		migrator.PauseDownload()
 		if migrator.IsMigrationError() {
 			opCtxCancel()
@@ -686,8 +696,16 @@ func (m *Migration) UpdateStateFile(migrateHandler *MigrationWorker) {
 		select {
 		case <-u.DoneChan:
 			updateState(u.ObjectKey)
+			zlogger.Logger.Info("Migration sdd: ", migration.startTime)
+
+			if totalMigrated == 0 {
+				zlogger.Logger.Info("Migration started at: ", migration.startTime)
+				migration.endTime = time.Now()
+				os.WriteFile(filepath.Join("migration_time.txt"), []byte(migration.endTime.Sub(migration.startTime).String()), 0644)
+			}
 			totalMigrated++
 			updateMigratedFile(strconv.Itoa(totalMigrated))
+
 		case <-u.ErrChan:
 			return
 		}
