@@ -14,8 +14,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/0chain/s3migration/azure"
 	"github.com/0chain/s3migration/dropbox"
 	"github.com/0chain/s3migration/gdrive"
+	gcloud "github.com/0chain/s3migration/google_cloud"
+	"github.com/0chain/s3migration/onedrive"
+	"github.com/0chain/s3migration/types"
 	T "github.com/0chain/s3migration/types"
 	"golang.org/x/oauth2"
 
@@ -84,6 +88,9 @@ type Migration struct {
 	bucket        string
 	chunkSize     int64
 	batchSize     int
+	key           string
+	startTime     time.Time
+	endTime       time.Time
 }
 
 type MigrationOperation struct {
@@ -142,30 +149,72 @@ func InitMigration(mConfig *MigrationConfig) error {
 		dataSourceStore, err = dropbox.GetDropboxClient(
 			util.GetAccessKeyFromEnv(),
 			mConfig.WorkDir,
+			mConfig.NewerThan,
+			mConfig.OlderThan,
 		)
-	} else if mConfig.Source == "google_drive" {
+	} else if mConfig.Source == "google_drive" || mConfig.Source == "google_cloud_storage" {
 		// use client id instead of access token to prevent expiry time
 		ClientID, ClientSecret := util.GetClientCredentialsFromEnv()
-		cfg := oauth2.Config{
-			ClientID:     ClientID,
-			ClientSecret: ClientSecret,
-			Endpoint: oauth2.Endpoint{
-				AuthURL:       "https://accounts.google.com/o/oauth2/auth",
-				DeviceAuthURL: "https://oauth2.googleapis.com/device/code",
-				TokenURL:      "https://oauth2.googleapis.com/token",
-			},
+		var cfg oauth2.Config
+		if ClientID != "" || ClientSecret != "" {
+			cfg = oauth2.Config{
+				ClientID:     ClientID,
+				ClientSecret: ClientSecret,
+				Endpoint: oauth2.Endpoint{
+					AuthURL:       "https://accounts.google.com/o/oauth2/auth",
+					DeviceAuthURL: "https://oauth2.googleapis.com/device/code",
+					TokenURL:      "https://oauth2.googleapis.com/token",
+				},
+			}
+		} else {
+			cfg = oauth2.Config{
+				Endpoint: oauth2.Endpoint{
+					AuthURL:       "https://accounts.google.com/o/oauth2/auth",
+					DeviceAuthURL: "https://oauth2.googleapis.com/device/code",
+					TokenURL:      "https://oauth2.googleapis.com/token",
+				},
+			}
 		}
 
 		token := &oauth2.Token{
 			AccessToken:  util.GetAccessKeyFromEnv(),
 			RefreshToken: util.GetRefreshKeyFromEnv(),
 		}
-
-		dataSourceStore, err = gdrive.NewGoogleDriveClient(
-			cfg,
+		if mConfig.Source == "google_drive" {
+			dataSourceStore, err = gdrive.NewGoogleDriveClient(
+				cfg,
+				token,
+				mConfig.WorkDir,
+				mConfig.NewerThan,
+				mConfig.OlderThan,
+			)
+		} else {
+			dataSourceStore, err = gcloud.NewGoogleCloudClient(cfg, token, mConfig.WorkDir, mConfig.NewerThan, mConfig.OlderThan)
+		}
+	} else if mConfig.Source == "onedrive" {
+		// use access token and refresh token to prevent expiry time
+		token := &oauth2.Token{
+			AccessToken:  util.GetAccessKeyFromEnv(),
+			RefreshToken: util.GetRefreshKeyFromEnv(),
+		}
+		dataSourceStore, err = onedrive.NewOneDriveClient(
 			token,
 			mConfig.WorkDir,
+			mConfig.NewerThan,
+			mConfig.OlderThan,
 		)
+
+	} else if mConfig.Source == "azure" {
+		connectionString, accountName, containerName := util.GetAzureCredentials()
+		dataSourceStore, err = azure.NewAzureClient(
+			mConfig.WorkDir,
+			accountName,
+			connectionString,
+			containerName,
+			mConfig.NewerThan,
+			mConfig.OlderThan,
+		)
+
 	} else {
 		zlogger.Logger.Error("invalid source: ", mConfig.Source)
 		return err
@@ -175,6 +224,13 @@ func InitMigration(mConfig *MigrationConfig) error {
 	if err != nil {
 		zlogger.Logger.Error(err)
 		return err
+	}
+	key := "objectKey"
+	if mConfig.Source == "google_drive" {
+		key = "objectName"
+	}
+	if mConfig.Source == "onedrive" {
+		key = "Id"
 	}
 
 	migration = Migration{
@@ -191,6 +247,7 @@ func InitMigration(mConfig *MigrationConfig) error {
 		fs:              util.Fs,
 		chunkSize:       mConfig.ChunkSize,
 		batchSize:       mConfig.BatchSize,
+		key:             key,
 	}
 
 	rootContext, rootContextCancel = context.WithCancel(context.Background())
@@ -251,7 +308,14 @@ func StartMigration() error {
 	defer func(start time.Time) {
 		zlogger.Logger.Info("time taken: ", time.Since(start))
 	}(time.Now())
+	migration.startTime = time.Now()
 
+	migrationTimeFilePath := filepath.Join("migration_time.txt")
+	if _, err := os.Stat(migrationTimeFilePath); err == nil {
+		if err := os.Remove(migrationTimeFilePath); err != nil {
+			zlogger.Logger.Error("Failed to remove migration_time.txt file: ", err)
+		}
+	}
 	if migration.deleteSource {
 		f, err := os.Create(filepath.Join(migration.workDir, sourceDeleteFailed))
 		if err != nil {
@@ -262,7 +326,6 @@ func StartMigration() error {
 	}
 
 	migrationWorker := NewMigrationWorker(migration.workDir)
-
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 	go func() {
@@ -279,9 +342,41 @@ func StartMigration() error {
 	if err != nil {
 		zlogger.Logger.Error("Error while migration, err", err)
 	}
-	zlogger.Logger.Info("Total migrated objects: ", migration.totalMigratedObjects)
+	zlogger.Logger.Info("Total migrated objects :: ", migration.totalMigratedObjects)
 	zlogger.Logger.Info("Total migrated size: ", migration.migratedSize)
+
+	if err := os.Remove(filepath.Join("files.count")); err != nil {
+		zlogger.Logger.Error("Failed to remove files.count file: ", err)
+	}
+	if err := os.Remove(filepath.Join("upload.count")); err != nil {
+		zlogger.Logger.Error("Failed to remove upload.count file: ", err)
+	}
+	if err := os.Remove(migration.stateFilePath); err != nil {
+		zlogger.Logger.Error("Failed to remove state file: ", err)
+	}
+	if err := os.Remove(filepath.Join("migration_time.txt")); err != nil {
+		zlogger.Logger.Error("Failed to remove migration_time.txt file: ", err)
+	}
 	return err
+}
+
+func getValueBasedOnKey(field_name string, key string, obj types.ObjectMeta) string {
+	if field_name == "objectName" {
+		if key == "objectKey" || key == "Id" {
+			return obj.Key
+		} else if key == "objectName" {
+			if obj.Name != nil {
+				return *obj.Name
+			}
+		}
+	} else if field_name == "objectKey" {
+		if key == "Id" {
+			return *obj.Id
+		} else {
+			return obj.Key
+		}
+	}
+	return ""
 }
 
 func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorker) {
@@ -295,8 +390,12 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 	var opLock sync.Mutex
 	currentSize := 0
 	opCtx, opCtxCancel := context.WithCancel(ctx)
+	var files_count = 0
+	var totalSize int64
 	for obj := range objCh {
 		zlogger.Logger.Info("Downloading object: ", obj.Key)
+		files_count++
+		totalSize += obj.Size
 		migrator.PauseDownload()
 		if migrator.IsMigrationError() {
 			opCtxCancel()
@@ -316,17 +415,19 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 			currentSize = 0
 		}
 		currentSize++
+		zlogger.Logger.Info("Downloding object info ", obj.Key, obj.Name, obj.Size)
 		downloadObjMeta := &DownloadObjectMeta{
-			ObjectKey: obj.Key,
-			Size:      obj.Size,
-			DoneChan:  make(chan struct{}, 1),
-			ErrChan:   make(chan error, 1),
-			mimeType:  obj.ContentType,
+			ObjectKey:  getValueBasedOnKey("objectKey", migration.key, *obj),
+			ObjectName: getValueBasedOnKey("objectName", migration.key, *obj),
+			Size:       obj.Size,
+			DoneChan:   make(chan struct{}, 1),
+			ErrChan:    make(chan error, 1),
+			mimeType:   obj.ContentType,
 		}
 		wg.Add(1)
 		go func() {
 			defer func(start time.Time) {
-				zlogger.Logger.Info("downloadObjMeta key:  ", downloadObjMeta.ObjectKey, time.Since(start))
+				zlogger.Logger.Info("downloadObjMeta key:  ", downloadObjMeta.ObjectName, time.Since(start))
 			}(time.Now())
 
 			defer wg.Done()
@@ -337,7 +438,7 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 				return
 			}
 			if downloadObjMeta.IsFileAlreadyExist && migration.skip == Skip {
-				zlogger.Logger.Info("Skipping migration of object" + downloadObjMeta.ObjectKey)
+				zlogger.Logger.Info("Skipping migration of object" + downloadObjMeta.ObjectName)
 				migrator.DownloadStart(downloadObjMeta)
 				migrator.DownloadDone(downloadObjMeta, "", nil)
 				return
@@ -353,6 +454,20 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 			opLock.Unlock()
 		}()
 	}
+
+	go func() {
+		f, err := os.Create(filepath.Join("files.count"))
+		if err != nil {
+			zlogger.Logger.Error(err)
+			return
+		}
+		defer f.Close()
+		_, err = f.WriteString(strconv.Itoa(files_count))
+		if err != nil {
+			zlogger.Logger.Error(err)
+		}
+	}()
+
 	if currentSize > 0 {
 		wg.Wait()
 		processOps := ops
@@ -463,7 +578,7 @@ func getRemotePath(objectKey string) string {
 }
 
 func checkIsFileExist(ctx context.Context, downloadObj *DownloadObjectMeta) error {
-	remotePath := getRemotePath(downloadObj.ObjectKey)
+	remotePath := getRemotePath(downloadObj.ObjectName)
 
 	var isFileExist bool
 	err := util.Retry(3, time.Second*5, func() error {
@@ -493,10 +608,10 @@ func checkDownloadStatus(downloadObj *DownloadObjectMeta) error {
 func processOperation(ctx context.Context, downloadObj *DownloadObjectMeta) (MigrationOperation, error) {
 
 	defer func(start time.Time) {
-		zlogger.Logger.Info("uploading object key:  ", downloadObj.ObjectKey, time.Since(start))
+		zlogger.Logger.Info("uploading object key:  ", downloadObj.ObjectName, time.Since(start))
 	}(time.Now())
 
-	remotePath := getRemotePath(downloadObj.ObjectKey)
+	remotePath := getRemotePath(downloadObj.ObjectName)
 	var op MigrationOperation
 	fileObj, err := migration.fs.Open(downloadObj.LocalPath)
 	if err != nil {
@@ -510,21 +625,21 @@ func processOperation(ctx context.Context, downloadObj *DownloadObjectMeta) (Mig
 	}
 	mimeType, err := zboxutil.GetFileContentType(path.Ext(fileInfo.Name()), fileObj)
 	if err != nil {
-		zlogger.Logger.Error("content type error: ", err, " file: ", fileInfo.Name(), " objKey:", downloadObj.ObjectKey)
+		zlogger.Logger.Error("content type error: ", err, " file: ", fileInfo.Name(), " objKey:", downloadObj.ObjectName)
 		return op, err
 	}
 	var fileOperation sdk.OperationRequest
 	if downloadObj.IsFileAlreadyExist {
 		switch migration.skip {
 		case Replace:
-			zlogger.Logger.Info("Replacing object" + downloadObj.ObjectKey + " size " + strconv.FormatInt(downloadObj.Size, 10))
+			zlogger.Logger.Info("Replacing object" + downloadObj.ObjectName + " size " + strconv.FormatInt(downloadObj.Size, 10))
 			fileOperation = migration.zStore.Replace(ctx, remotePath, fileObj, downloadObj.Size, mimeType)
 		case Duplicate:
-			zlogger.Logger.Info("Duplicating object" + downloadObj.ObjectKey + " size " + strconv.FormatInt(downloadObj.Size, 10))
+			zlogger.Logger.Info("Duplicating object" + downloadObj.ObjectName + " size " + strconv.FormatInt(downloadObj.Size, 10))
 			fileOperation = migration.zStore.Duplicate(ctx, remotePath, fileObj, downloadObj.Size, mimeType)
 		}
 	} else {
-		zlogger.Logger.Info("Uploading object: " + downloadObj.ObjectKey + " size " + strconv.FormatInt(downloadObj.Size, 10))
+		zlogger.Logger.Info("Uploading object: " + downloadObj.ObjectName + " size " + strconv.FormatInt(downloadObj.Size, 10))
 		fileOperation = migration.zStore.Upload(ctx, remotePath, fileObj, downloadObj.Size, mimeType, false)
 	}
 	op.Operation = fileOperation
@@ -532,21 +647,21 @@ func processOperation(ctx context.Context, downloadObj *DownloadObjectMeta) (Mig
 }
 
 func processOperationForMemory(ctx context.Context, downloadObj *DownloadObjectMeta, r io.Reader) (MigrationOperation, error) {
-	remotePath := getRemotePath(downloadObj.ObjectKey)
+	remotePath := getRemotePath(downloadObj.ObjectName)
 	var op MigrationOperation
 	mimeType := downloadObj.mimeType
 	var fileOperation sdk.OperationRequest
 	if downloadObj.IsFileAlreadyExist {
 		switch migration.skip {
 		case Replace:
-			zlogger.Logger.Info("Replacing object" + downloadObj.ObjectKey + " size " + strconv.FormatInt(downloadObj.Size, 10))
+			zlogger.Logger.Info("Replacing object" + downloadObj.ObjectName + " size " + strconv.FormatInt(downloadObj.Size, 10))
 			fileOperation = migration.zStore.Replace(ctx, remotePath, r, downloadObj.Size, mimeType)
 		case Duplicate:
-			zlogger.Logger.Info("Duplicating object " + downloadObj.ObjectKey + " size " + strconv.FormatInt(downloadObj.Size, 10))
+			zlogger.Logger.Info("Duplicating object " + downloadObj.ObjectName + " size " + strconv.FormatInt(downloadObj.Size, 10))
 			fileOperation = migration.zStore.Duplicate(ctx, remotePath, r, downloadObj.Size, mimeType)
 		}
 	} else {
-		zlogger.Logger.Info("Uploading object: " + downloadObj.ObjectKey + " size " + strconv.FormatInt(downloadObj.Size, 10))
+		zlogger.Logger.Info("Uploading object: " + downloadObj.ObjectName + " size " + strconv.FormatInt(downloadObj.Size, 10))
 		fileOperation = migration.zStore.Upload(ctx, remotePath, r, downloadObj.Size, mimeType, false)
 	}
 	op.Operation = fileOperation
@@ -578,7 +693,9 @@ func (m *Migration) UpdateStateFile(migrateHandler *MigrationWorker) {
 	}
 	defer closeStateFile()
 
-	updateMigratedFile, closeMigratedFile, err := updateKeyFunc(filepath.Join(migration.workDir, uploadCountFileName))
+	// write for file to be uploaded
+
+	updateMigratedFile, closeMigratedFile, err := updateKeyFunc(filepath.Join(uploadCountFileName))
 	if err != nil {
 		zlogger.Logger.Error(err)
 		migrateHandler.SetMigrationError(err)
@@ -592,6 +709,10 @@ func (m *Migration) UpdateStateFile(migrateHandler *MigrationWorker) {
 		select {
 		case <-u.DoneChan:
 			updateState(u.ObjectKey)
+			if totalMigrated == 0 {
+				elapsedTime := migration.endTime.Sub(migration.startTime)
+				os.WriteFile(filepath.Join("migration_time.txt"), []byte(fmt.Sprintf("%v", elapsedTime)), 0644)
+			}
 			totalMigrated++
 			updateMigratedFile(strconv.Itoa(totalMigrated))
 		case <-u.ErrChan:
@@ -641,7 +762,7 @@ func (m *Migration) processMultiOperation(ctx context.Context, ops []MigrationOp
 	})
 	for _, op := range ops {
 		migrator.UploadDone(op.uploadObj, err)
-		zlogger.Logger.Info("upload done: ", op.uploadObj.ObjectKey, " size ", op.uploadObj.Size, err)
+		zlogger.Logger.Info("upload done for object key: ", op.uploadObj.ObjectKey, " size ", op.uploadObj.Size, err)
 	}
 	migrator.SetMigrationError(err)
 	return err
@@ -651,6 +772,7 @@ func (m *Migration) processChunkDownload(ctx context.Context, sw *util.StreamWri
 	// chunk download and pipe data
 
 	migrator.DownloadStart(downloadObjMeta)
+	zlogger.Logger.Info("Downloading object: ", downloadObjMeta.ObjectName)
 	offset := 0
 	chunkSize := int(m.chunkSize)
 	acceptedChunkSize := int(m.zStore.GetChunkWriteSize())

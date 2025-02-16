@@ -1,4 +1,4 @@
-package gdrive
+package azure
 
 import (
 	"context"
@@ -6,39 +6,17 @@ import (
 	"testing"
 
 	zlogger "github.com/0chain/s3migration/logger"
-	"golang.org/x/oauth2"
 )
 
 var (
-	driveAccessToken  = ""
-	testFileID        = ""
-	driveRefreshToken = ""
-	clientId          = ""
-	clientSecret      = ""
+	connectionString = ""
+	testFileID       = ""
+	workDir          = ""
+	accountName      = ""
 )
 
-func getOAuthConfig() (*oauth2.Config, *oauth2.Token) {
-	cfg := &oauth2.Config{
-		ClientID:     clientId,
-		ClientSecret: clientSecret,
-		Endpoint: oauth2.Endpoint{
-			AuthURL:       "https://accounts.google.com/o/oauth2/auth",
-			DeviceAuthURL: "https://oauth2.googleapis.com/device/code",
-			TokenURL:      "https://oauth2.googleapis.com/token",
-		},
-	}
-
-	token := &oauth2.Token{
-		AccessToken:  driveAccessToken,
-		RefreshToken: driveRefreshToken,
-	}
-
-	return cfg, token
-}
-
-func TestGoogleDriveClient_ListFiles(t *testing.T) {
-	cfg, token := getOAuthConfig()
-	client, err := NewGoogleDriveClient(*cfg, token, "./", nil, nil)
+func TestAzureClient_ListFiles(t *testing.T) {
+	client, err := NewAzureClient(workDir, accountName, connectionString, workDir, nil, nil)
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("err while creating Google Drive client: %v", err))
 		return
@@ -56,11 +34,11 @@ func TestGoogleDriveClient_ListFiles(t *testing.T) {
 	for object := range objectChan {
 		zlogger.Logger.Info(fmt.Sprintf("file:%s, size: %d bytes, type: %s", object.Key, object.Size, object.ContentType))
 	}
+	zlogger.Logger.Info("DATA")
 }
 
-func TestGoogleDriveClient_GetFileContent(t *testing.T) {
-	cfg, token := getOAuthConfig()
-	client, err := NewGoogleDriveClient(*cfg, token, "./", nil, nil)
+func TestAzureClient_GetFileContent(t *testing.T) {
+	client, err := NewAzureClient(workDir, accountName, connectionString, workDir, nil, nil)
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("Failed to creating Google Drive client: %v", err))
 		return
@@ -93,9 +71,8 @@ func TestGoogleDriveClient_GetFileContent(t *testing.T) {
 	zlogger.Logger.Info(fmt.Sprintf("read data: %s", buf[:n]))
 }
 
-func TestGoogleDriveClient_DeleteFile(t *testing.T) {
-	cfg, token := getOAuthConfig()
-	client, err := NewGoogleDriveClient(*cfg, token, "./", nil, nil)
+func TestAzureClient_DeleteFile(t *testing.T) {
+	client, err := NewAzureClient(workDir, accountName, connectionString, workDir, nil, nil)
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("err while creating Google Drive client: %v", err))
 		return
@@ -111,9 +88,8 @@ func TestGoogleDriveClient_DeleteFile(t *testing.T) {
 	zlogger.Logger.Error(fmt.Sprintf("file: %s deleted successfully", fileID))
 }
 
-func TestGoogleDriveClient_DownloadToFile(t *testing.T) {
-	cfg, token := getOAuthConfig()
-	client, err := NewGoogleDriveClient(*cfg, token, "./", nil, nil)
+func TestAzureClient_DownloadToFile(t *testing.T) {
+	client, err := NewAzureClient(workDir, accountName, connectionString, workDir, nil, nil)
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("err while creating Google Drive client: %v", err))
 	}
@@ -128,9 +104,8 @@ func TestGoogleDriveClient_DownloadToFile(t *testing.T) {
 	zlogger.Logger.Info(fmt.Sprintf("downloaded to: %s", destinationPath))
 }
 
-func TestGoogleDriveClient_DownloadToMemory(t *testing.T) {
-	cfg, token := getOAuthConfig()
-	client, err := NewGoogleDriveClient(*cfg, token, "./", nil, nil)
+func TestAzureClient_DownloadToMemory(t *testing.T) {
+	client, err := NewAzureClient(workDir, accountName, connectionString, workDir, nil, nil)
 	if err != nil {
 		zlogger.Logger.Error(fmt.Sprintf("err while creating Google Drive client: %v", err))
 	}

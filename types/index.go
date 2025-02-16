@@ -16,7 +16,9 @@ type ObjectMeta struct {
 	Key         string
 	Size        int64
 	ContentType string
+	Id          *string
 	Ext         string
+	Name        *string
 }
 
 type CloudStorageI interface {
@@ -30,4 +32,3 @@ type CloudStorageI interface {
 type CloudStorageClient struct {
 	name string
 }
-

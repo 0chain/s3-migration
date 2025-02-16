@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path"
+	"time"
 
 	zlogger "github.com/0chain/s3migration/logger"
 	T "github.com/0chain/s3migration/types"
@@ -16,13 +18,25 @@ import (
 )
 
 type GoogleDriveClient struct {
-	service *drive.Service
-	workDir string
+	service   *drive.Service
+	workDir   string
+	newerThan *time.Time
+	olderThan *time.Time
 }
 
-func NewGoogleDriveClient(cfg oauth2.Config, token *oauth2.Token, workDir string) (*GoogleDriveClient, error) {
+func NewGoogleDriveClient(cfg oauth2.Config, token *oauth2.Token, workDir string, newerThan *time.Time, olderThan *time.Time) (*GoogleDriveClient, error) {
 	ctx := context.Background()
-	httpClient := cfg.Client(ctx, token)
+	var httpClient *http.Client
+
+	if cfg.ClientID == "" || cfg.ClientSecret == "" {
+		tokenSource := oauth2.StaticTokenSource(&oauth2.Token{
+			AccessToken:  token.AccessToken,
+			RefreshToken: token.RefreshToken,
+		})
+		httpClient = oauth2.NewClient(ctx, tokenSource)
+	} else {
+		httpClient = cfg.Client(ctx, token)
+	}
 
 	service, err := drive.NewService(ctx, option.WithHTTPClient(httpClient))
 	if err != nil {
@@ -35,8 +49,10 @@ func NewGoogleDriveClient(cfg oauth2.Config, token *oauth2.Token, workDir string
 	}
 
 	return &GoogleDriveClient{
-		service: service,
-		workDir: workDir,
+		service:   service,
+		workDir:   workDir,
+		newerThan: newerThan,
+		olderThan: olderThan,
 	}, nil
 }
 
@@ -55,7 +71,7 @@ func (g *GoogleDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta
 		filesReq.Q("trashed=false")
 
 		filesReq.Fields(
-			"files(id, mimeType, size,fileExtension)",
+			"files(id, mimeType, size,fileExtension, name, modifiedTime)",
 		)
 
 		filesReq.Pages(ctx, func(page *drive.FileList) error {
@@ -71,11 +87,22 @@ func (g *GoogleDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta
 		}
 
 		for _, file := range files.Files {
-			objectChan <- &T.ObjectMeta{
-				Key:         file.Id,
-				Size:        file.Size,
-				ContentType: file.MimeType,
-				Ext: file.FileExtension,
+			lastModified, err := time.Parse(time.RFC3339, file.ModifiedTime)
+
+			if err != nil {
+				zlogger.Logger.Error(err)
+				continue
+			}
+
+			if (g.newerThan == nil || g.newerThan.Unix() == 0 || lastModified.Unix() >= g.newerThan.Unix()) &&
+				(g.olderThan == nil || g.olderThan.Unix() == 0 || lastModified.Unix() <= g.olderThan.Unix()) {
+				objectChan <- &T.ObjectMeta{
+					Key:         file.Id,
+					Size:        file.Size,
+					ContentType: file.MimeType,
+					Ext:         file.FileExtension,
+					Name:        &file.Name,
+				}
 			}
 		}
 
@@ -96,6 +123,8 @@ func (g *GoogleDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta
 					Key:         file.Id,
 					Size:        file.Size,
 					ContentType: file.MimeType,
+					Ext:         file.FileExtension,
+					Name:        &file.Name,
 				}
 			}
 
@@ -137,6 +166,7 @@ func (g *GoogleDriveClient) DownloadToFile(ctx context.Context, fileID string) (
 	resp, err := g.service.Files.Get(fileID).Download()
 	if err != nil {
 		return "", err
+
 	}
 	defer resp.Body.Close()
 
@@ -146,7 +176,7 @@ func (g *GoogleDriveClient) DownloadToFile(ctx context.Context, fileID string) (
 	}
 
 	zlogger.Logger.Info(fmt.Sprintf("Original File Name: %s", file.Name))
-	destinationPath := path.Join(g.workDir, file.Name )
+	destinationPath := path.Join(g.workDir, file.Name)
 
 	out, err := os.Create(destinationPath)
 	if err != nil {
@@ -160,7 +190,7 @@ func (g *GoogleDriveClient) DownloadToFile(ctx context.Context, fileID string) (
 		return "", err
 	}
 
-	zlogger.Logger.Info(fmt.Sprintf("Downloaded file ID: %s to %s\n", fileID, destinationPath))
+	zlogger.Logger.Info(fmt.Sprintf("Downloaded file ID: %s to %s", fileID, destinationPath))
 	return destinationPath, nil
 }
 

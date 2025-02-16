@@ -41,9 +41,38 @@ var (
 	chunkNumber                int
 	batchSize                  int
 	source                     string
-	clientId				   string
-	clientSecret 			   string
+	clientId                   string
+	clientSecret               string
+	connectionString           string
+	accountName                string
+	containerName              string
 )
+
+var azureCredentials = map[string]*string{
+	"connection string": &connectionString,
+	"account name":      &accountName,
+	"container name":    &containerName,
+}
+
+var Credentials = map[string]*string{
+	"access key": &accessKey,
+	"secret key": &secretKey,
+}
+
+func validateCredentials(credentials map[string]*string) error {
+	missingFields := []string{}
+
+	for key, value := range credentials {
+		if *value == "" {
+			missingFields = append(missingFields, key)
+		}
+	}
+	if len(missingFields) > 0 {
+		return errors.New("Missing fields: " + strings.Join(missingFields, ", "))
+	}
+
+	return nil
+}
 
 // migrateCmd is the migrateFromS3 sub command to migrate whole objects from some buckets.
 func init() {
@@ -74,9 +103,14 @@ func init() {
 	migrateCmd.Flags().Int64Var(&chunkSize, "chunk-size", 50*1024*1024, "chunk size in bytes")
 	migrateCmd.Flags().IntVar(&chunkNumber, "chunk-number", 250, "number of chunks to upload")
 	migrateCmd.Flags().IntVar(&batchSize, "batch-size", 20, "number of files to upload in a batch")
-	migrateCmd.Flags().StringVar(&source, "source", "s3", "s3 or google_drive or dropbox")
+	migrateCmd.Flags().StringVar(&source, "source", "s3", "s3 or google_drive or dropbox or azure or google_cloud_storage")
 	migrateCmd.Flags().StringVar(&clientId, "client-id", "", "Client id for Google app console")
 	migrateCmd.Flags().StringVar(&clientSecret, "client-secret", "", "Client secret for Google app console")
+
+	// in case of azure it takes connectionString as param
+	migrateCmd.PersistentFlags().StringVar(&connectionString, "connection-string", "", "connection string for azure")
+	migrateCmd.PersistentFlags().StringVar(&accountName, "account-name", "", "account name for azure")
+	migrateCmd.PersistentFlags().StringVar(&containerName, "container", "", "container name for azure")
 }
 
 var migrateCmd = &cobra.Command{
@@ -117,7 +151,20 @@ var migrateCmd = &cobra.Command{
 		}
 
 		if source == "" {
-			source = "s3"
+			source = "s3" // default
+		}
+
+		cloud_sources := map[string]bool{
+			"google_drive":         true,
+			"s3":                   true,
+			"dropbox":              true,
+			"onedrive":             true,
+			"azure":                true,
+			"google_cloud_storage": true,
+		}
+
+		if _, ok := cloud_sources[source]; !ok {
+			return errors.New("invalid source. Supported sources: s3, google_drive, dropbox, onedrive, azure, google_cloud_storage")
 		}
 
 		if (accessKey == "" || secretKey == "") && source == "s3" {
@@ -130,17 +177,21 @@ var migrateCmd = &cobra.Command{
 				}
 			}
 		}
-		// check if client id and secret exist for google drive 
-
-		if (clientId == "" && clientSecret == "" && source=="google_drive") {
-			return fmt.Errorf("missing google client credentials")
-		}
 
 		if bucket == "" && source == "s3" {
 			bucket, region, prefix, err = util.GetBucketRegionPrefixFromFile(awsCredPath)
 			if err != nil {
 				return err
 			}
+		}
+
+		if err := validateCredentials(func() map[string]*string {
+			if source == "azure" {
+				return azureCredentials
+			}
+			return Credentials
+		}()); err != nil {
+			return err
 		}
 
 		if skip < 0 || skip > 2 {
@@ -211,8 +262,15 @@ var migrateCmd = &cobra.Command{
 				startAfter = strings.ReplaceAll(strings.ReplaceAll(startAfter, " ", ""), "\n", "")
 			}
 		}
-		if err := util.SetAwsEnvCredentials(accessKey, secretKey); err != nil {
-			return err
+
+		if source == "azure" {
+			if err := util.SetAzureCredentials(connectionString, accountName, containerName); err != nil {
+				return err
+			}
+		} else {
+			if err := util.SetAwsEnvCredentials(accessKey, secretKey); err != nil {
+				return err
+			}
 		}
 
 		if chunkNumber == 0 {
@@ -245,12 +303,13 @@ var migrateCmd = &cobra.Command{
 			ChunkSize:       chunkSize,
 			ChunkNumber:     chunkNumber,
 			BatchSize:       batchSize,
-			Source:      source,
+			Source:          source,
 		}
 
 		if err := migration.InitMigration(&mConfig); err != nil {
 			return err
 		}
+
 		err = migration.StartMigration()
 		if err != nil {
 			return err
