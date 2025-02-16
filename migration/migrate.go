@@ -117,6 +117,20 @@ func updateTotalObjects(totalObjChan chan struct{}, wd string) error {
 func InitMigration(mConfig *MigrationConfig) error {
 	zlogger.Logger.Info("Initializing migration")
 	zlogger.Logger.Info("Getting dStorage service")
+	// delete files at this level to ignore duplicate scenario
+	if err := os.Remove(filepath.Join("files.count")); err != nil {
+		zlogger.Logger.Error("Failed to remove files.count file: ", err)
+	}
+	if err := os.Remove(filepath.Join("upload.count")); err != nil {
+		zlogger.Logger.Error("Failed to remove upload.count file: ", err)
+	}
+	if err := os.Remove(migration.stateFilePath); err != nil {
+		zlogger.Logger.Error("Failed to remove state file: ", err)
+	}
+	if err := os.Remove(filepath.Join("migration_time.txt")); err != nil {
+		zlogger.Logger.Error("Failed to remove migration_time.txt file: ", err)
+	}
+	
 	dStorageService, err := dStorage.GetDStorageService(
 		mConfig.AllocationID,
 		mConfig.MigrateToPath,
@@ -344,19 +358,6 @@ func StartMigration() error {
 	}
 	zlogger.Logger.Info("Total migrated objects :: ", migration.totalMigratedObjects)
 	zlogger.Logger.Info("Total migrated size: ", migration.migratedSize)
-
-	if err := os.Remove(filepath.Join("files.count")); err != nil {
-		zlogger.Logger.Error("Failed to remove files.count file: ", err)
-	}
-	if err := os.Remove(filepath.Join("upload.count")); err != nil {
-		zlogger.Logger.Error("Failed to remove upload.count file: ", err)
-	}
-	if err := os.Remove(migration.stateFilePath); err != nil {
-		zlogger.Logger.Error("Failed to remove state file: ", err)
-	}
-	if err := os.Remove(filepath.Join("migration_time.txt")); err != nil {
-		zlogger.Logger.Error("Failed to remove migration_time.txt file: ", err)
-	}
 	return err
 }
 
