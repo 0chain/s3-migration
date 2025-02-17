@@ -8,6 +8,7 @@ require (
 	cloud.google.com/go/storage v1.46.0
 	github.com/0chain/errors v1.0.3
 	github.com/0chain/gosdk v1.18.13-0.20241209154844-07366a2c2666
+	github.com/0chain/onedrive v1.1.1
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.4.1
 	github.com/aws/aws-sdk-go-v2 v1.17.1
 	github.com/aws/aws-sdk-go-v2/config v1.17.10
@@ -50,9 +51,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.1 // indirect
 	github.com/hitenjain14/fasthttp v0.0.0-20240916135632-f9303a91736c // indirect
 	github.com/klauspost/compress v1.17.0 // indirect
-	github.com/pewssh/onedrive v0.0.0-20241224134620-3b06c57901d9 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
-	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.51.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
