@@ -130,7 +130,7 @@ func InitMigration(mConfig *MigrationConfig) error {
 	if err := os.Remove(filepath.Join("migration_time.txt")); err != nil {
 		zlogger.Logger.Error("Failed to remove migration_time.txt file: ", err)
 	}
-	
+
 	dStorageService, err := dStorage.GetDStorageService(
 		mConfig.AllocationID,
 		mConfig.MigrateToPath,
@@ -324,7 +324,7 @@ func StartMigration() error {
 	}(time.Now())
 	migration.startTime = time.Now()
 
-	migrationTimeFilePath := filepath.Join("migration_time.txt")
+	migrationTimeFilePath := filepath.Join(migration.workDir, "migration_time.txt")
 	if _, err := os.Stat(migrationTimeFilePath); err == nil {
 		if err := os.Remove(migrationTimeFilePath); err != nil {
 			zlogger.Logger.Error("Failed to remove migration_time.txt file: ", err)
@@ -696,7 +696,7 @@ func (m *Migration) UpdateStateFile(migrateHandler *MigrationWorker) {
 
 	// write for file to be uploaded
 
-	updateMigratedFile, closeMigratedFile, err := updateKeyFunc(filepath.Join(uploadCountFileName))
+	updateMigratedFile, closeMigratedFile, err := updateKeyFunc(filepath.Join(m.workDir, uploadCountFileName))
 	if err != nil {
 		zlogger.Logger.Error(err)
 		migrateHandler.SetMigrationError(err)
