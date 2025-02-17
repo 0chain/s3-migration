@@ -7,7 +7,7 @@ toolchain go1.22.5
 require (
 	cloud.google.com/go/storage v1.46.0
 	github.com/0chain/errors v1.0.3
-	github.com/0chain/gosdk v1.18.13-0.20241209154844-07366a2c2666
+	github.com/0chain/gosdk v1.19.4
 	github.com/0chain/onedrive v1.1.1
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.4.1
 	github.com/aws/aws-sdk-go-v2 v1.17.1
@@ -15,6 +15,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.37
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.29.1
 	github.com/golang/mock v1.6.0
+	github.com/pewssh/onedrive v0.0.0-20241224134620-3b06c57901d9
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.15.0
 	golang.org/x/oauth2 v0.23.0
