@@ -49,9 +49,9 @@ var (
 )
 
 var azureCredentials = map[string]*string{
-	"connection string": &connectionString,
-	"account name":      &accountName,
-	"container name":    &containerName,
+	"access key":     &accessKey,
+	"account name":   &accountName,
+	"container name": &containerName,
 }
 
 var Credentials = map[string]*string{
@@ -107,8 +107,6 @@ func init() {
 	migrateCmd.Flags().StringVar(&clientId, "client-id", "", "Client id for Google app console")
 	migrateCmd.Flags().StringVar(&clientSecret, "client-secret", "", "Client secret for Google app console")
 
-	// in case of azure it takes connectionString as param
-	migrateCmd.PersistentFlags().StringVar(&connectionString, "connection-string", "", "connection string for azure")
 	migrateCmd.PersistentFlags().StringVar(&accountName, "account-name", "", "account name for azure")
 	migrateCmd.PersistentFlags().StringVar(&containerName, "container", "", "container name for azure")
 }
@@ -264,6 +262,7 @@ var migrateCmd = &cobra.Command{
 		}
 
 		if source == "azure" {
+			connectionString = fmt.Sprintf("DefaultEndpointsProtocol=https;AccountName=%s;AccountKey=%s", accountName, accessKey)
 			if err := util.SetAzureCredentials(connectionString, accountName, containerName); err != nil {
 				return err
 			}
