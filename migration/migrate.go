@@ -203,7 +203,7 @@ func InitMigration(mConfig *MigrationConfig) error {
 				mConfig.OlderThan,
 			)
 		} else {
-			dataSourceStore, err = gcloud.NewGoogleCloudClient(cfg, token, mConfig.WorkDir, mConfig.NewerThan, mConfig.OlderThan)
+			dataSourceStore, err = gcloud.NewGoogleCloudClient(cfg, token, mConfig.Bucket, mConfig.NewerThan, mConfig.OlderThan)
 		}
 	} else if mConfig.Source == "onedrive" {
 		// use access token and refresh token to prevent expiry time
