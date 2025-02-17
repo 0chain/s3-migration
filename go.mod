@@ -8,6 +8,7 @@ require (
 	cloud.google.com/go/storage v1.46.0
 	github.com/0chain/errors v1.0.3
 	github.com/0chain/gosdk v1.19.4
+	github.com/0chain/onedrive v1.1.1
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.4.1
 	github.com/aws/aws-sdk-go-v2 v1.17.1
 	github.com/aws/aws-sdk-go-v2/config v1.17.10
