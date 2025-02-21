@@ -262,7 +262,7 @@ var migrateCmd = &cobra.Command{
 		}
 
 		if source == "azure" {
-			connectionString = fmt.Sprintf("DefaultEndpointsProtocol=https;AccountName=%s;AccountKey=%s", accountName, accessKey)
+			connectionString = fmt.Sprintf("DefaultEndpointsProtocol=https;AccountName=%s;AccountKey=%sEndpointSuffix=core.windows.net", accountName, accessKey)
 			if err := util.SetAzureCredentials(connectionString, accountName, containerName); err != nil {
 				return err
 			}
