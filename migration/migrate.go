@@ -457,7 +457,7 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 	}
 
 	go func() {
-		f, err := os.Create(filepath.Join("files.count"))
+		f, err := os.Create(filepath.Join(m.workDir, "files.count"))
 		if err != nil {
 			zlogger.Logger.Error(err)
 			return
@@ -711,8 +711,13 @@ func (m *Migration) UpdateStateFile(migrateHandler *MigrationWorker) {
 		case <-u.DoneChan:
 			updateState(u.ObjectKey)
 			if totalMigrated == 0 {
-				elapsedTime := migration.endTime.Sub(migration.startTime)
-				os.WriteFile(filepath.Join("migration_time.txt"), []byte(fmt.Sprintf("%v", elapsedTime)), 0644)
+				currentTime := time.Now()
+				elapsedTime := currentTime.Sub(migration.startTime)
+
+				err := os.WriteFile(filepath.Join(m.workDir, "migration_time.txt"), []byte(fmt.Sprintf("%v", elapsedTime)), 0644)
+				if err != nil {
+					zlogger.Logger.Error(err)
+				}
 			}
 			totalMigrated++
 			updateMigratedFile(strconv.Itoa(totalMigrated))
