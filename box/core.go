@@ -45,22 +45,7 @@ type BoxClient struct {
 
 func GetBoxClient(options BoxClient) (*BoxClient, error) {
 
-	// get client id and client secret from config.json
-	boxConfig, err := os.ReadFile("box/config.json")
-	if err != nil {
-		return &options, err
-	}
-
-	var config map[string]string
-	err = json.Unmarshal(boxConfig, &config)
-	if err != nil {
-		return &options, err
-	}
-
-	options.ClientID = config["client_id"]
-	options.ClientSecret = config["client_secret"]
-
-	err = checkTokenValid(context.Background(), &options)
+	err := checkTokenValid(context.Background(), &options)
 	if err != nil {
 		return &options, err
 	}
