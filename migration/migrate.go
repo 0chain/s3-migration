@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/0chain/s3migration/azure"
+	"github.com/0chain/s3migration/box"
 	"github.com/0chain/s3migration/dropbox"
 	"github.com/0chain/s3migration/gdrive"
 	gcloud "github.com/0chain/s3migration/google_cloud"
@@ -166,6 +167,16 @@ func InitMigration(mConfig *MigrationConfig) error {
 			mConfig.NewerThan,
 			mConfig.OlderThan,
 		)
+	} else if mConfig.Source == "box" {
+
+		dataSourceStore, err = box.GetBoxClient(box.BoxClient{
+			WorkDir:      mConfig.WorkDir,
+			AccessToken:  util.GetAccessKeyFromEnv(),
+			RefreshToken: util.GetRefreshKeyFromEnv(),
+			NewerThan:    mConfig.NewerThan,
+			OlderThan:    mConfig.OlderThan,
+		})
+
 	} else if mConfig.Source == "google_drive" || mConfig.Source == "google_cloud_storage" {
 		// use client id instead of access token to prevent expiry time
 		ClientID, ClientSecret := util.GetClientCredentialsFromEnv()

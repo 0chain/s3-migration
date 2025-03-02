@@ -103,7 +103,7 @@ func init() {
 	migrateCmd.Flags().Int64Var(&chunkSize, "chunk-size", 50*1024*1024, "chunk size in bytes")
 	migrateCmd.Flags().IntVar(&chunkNumber, "chunk-number", 250, "number of chunks to upload")
 	migrateCmd.Flags().IntVar(&batchSize, "batch-size", 20, "number of files to upload in a batch")
-	migrateCmd.Flags().StringVar(&source, "source", "s3", "s3 or google_drive or dropbox or azure or google_cloud_storage")
+	migrateCmd.Flags().StringVar(&source, "source", "s3", "s3 or google_drive or dropbox or azure or google_cloud_storage or box")
 	migrateCmd.Flags().StringVar(&clientId, "client-id", "", "Client id for Google app console")
 	migrateCmd.Flags().StringVar(&clientSecret, "client-secret", "", "Client secret for Google app console")
 
@@ -159,10 +159,11 @@ var migrateCmd = &cobra.Command{
 			"onedrive":             true,
 			"azure":                true,
 			"google_cloud_storage": true,
+			"box":                  true,
 		}
 
 		if _, ok := cloud_sources[source]; !ok {
-			return errors.New("invalid source. Supported sources: s3, google_drive, dropbox, onedrive, azure, google_cloud_storage")
+			return errors.New("invalid source. Supported sources: s3, google_drive, dropbox, onedrive, azure, google_cloud_storage, box")
 		}
 
 		if (accessKey == "" || secretKey == "") && source == "s3" {
