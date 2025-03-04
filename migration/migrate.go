@@ -251,7 +251,7 @@ func InitMigration(mConfig *MigrationConfig) error {
 		return err
 	}
 	key := "objectKey"
-	if mConfig.Source == "google_drive" {
+	if mConfig.Source == "google_drive" || mConfig.Source == "box" {
 		key = "objectName"
 	}
 	if mConfig.Source == "onedrive" {
