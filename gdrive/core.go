@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strings"
 	"time"
 
 	zlogger "github.com/0chain/s3migration/logger"
@@ -36,6 +37,19 @@ func NewGoogleDriveClient(cfg oauth2.Config, token *oauth2.Token, workDir string
 		httpClient = oauth2.NewClient(ctx, tokenSource)
 	} else {
 		httpClient = cfg.Client(ctx, token)
+	}
+
+	// if access token is expired, refresh it
+	if token.Expiry.Before(time.Now()) {
+		token, err := cfg.TokenSource(ctx, token).Token()
+		if err != nil {
+			return nil, err
+		}
+		tokenSource := oauth2.StaticTokenSource(&oauth2.Token{
+			AccessToken:  token.AccessToken,
+			RefreshToken: token.RefreshToken,
+		})
+		httpClient = oauth2.NewClient(ctx, tokenSource)
 	}
 
 	service, err := drive.NewService(ctx, option.WithHTTPClient(httpClient))
@@ -136,14 +150,29 @@ func (g *GoogleDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta
 }
 
 func (g *GoogleDriveClient) GetFileContent(ctx context.Context, fileID string) (*T.Object, error) {
-	resp, err := g.service.Files.Get(fileID).Download()
+	// Get file metadata first to check if it needs to be exported
+	file, err := g.service.Files.Get(fileID).Fields("mimeType").Do()
 	if err != nil {
 		return nil, err
 	}
 
-	// if !keepOpen {
-	// 	defer resp.Body.Close()
-	// }
+	var resp *http.Response
+	// Handle Google Workspace files that need to be exported
+	switch file.MimeType {
+	case "application/vnd.google-apps.document":
+		resp, err = g.service.Files.Export(fileID, "application/vnd.openxmlformats-officedocument.wordprocessingml.document").Download()
+	case "application/vnd.google-apps.spreadsheet":
+		resp, err = g.service.Files.Export(fileID, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet").Download()
+	case "application/vnd.google-apps.presentation":
+		resp, err = g.service.Files.Export(fileID, "application/vnd.openxmlformats-officedocument.presentationml.presentation").Download()
+	default:
+		// Regular file download
+		resp, err = g.service.Files.Get(fileID).Download()
+	}
+
+	if err != nil {
+		return nil, err
+	}
 
 	obj := &T.Object{
 		Body:          resp.Body,
@@ -163,20 +192,44 @@ func (g *GoogleDriveClient) DeleteFile(ctx context.Context, fileID string) error
 }
 
 func (g *GoogleDriveClient) DownloadToFile(ctx context.Context, fileID string) (string, error) {
-	resp, err := g.service.Files.Get(fileID).Download()
+	// Get file metadata first
+	file, err := g.service.Files.Get(fileID).Fields("name, mimeType").Do()
 	if err != nil {
 		return "", err
+	}
 
+	var resp *http.Response
+	fileName := file.Name
+
+	// Handle Google Workspace files that need to be exported
+	switch file.MimeType {
+	case "application/vnd.google-apps.document":
+		resp, err = g.service.Files.Export(fileID, "application/vnd.openxmlformats-officedocument.wordprocessingml.document").Download()
+		if !strings.HasSuffix(fileName, ".docx") {
+			fileName += ".docx"
+		}
+	case "application/vnd.google-apps.spreadsheet":
+		resp, err = g.service.Files.Export(fileID, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet").Download()
+		if !strings.HasSuffix(fileName, ".xlsx") {
+			fileName += ".xlsx"
+		}
+	case "application/vnd.google-apps.presentation":
+		resp, err = g.service.Files.Export(fileID, "application/vnd.openxmlformats-officedocument.presentationml.presentation").Download()
+		if !strings.HasSuffix(fileName, ".pptx") {
+			fileName += ".pptx"
+		}
+	default:
+		// Regular file download
+		resp, err = g.service.Files.Get(fileID).Download()
+	}
+
+	if err != nil {
+		return "", err
 	}
 	defer resp.Body.Close()
 
-	file, err := g.service.Files.Get(fileID).Fields("name").Do()
-	if err != nil {
-		return "", err
-	}
-
-	zlogger.Logger.Info(fmt.Sprintf("Original File Name: %s", file.Name))
-	destinationPath := path.Join(g.workDir, file.Name)
+	zlogger.Logger.Info(fmt.Sprintf("Original File Name: %s", fileName))
+	destinationPath := path.Join(g.workDir, fileName)
 
 	out, err := os.Create(destinationPath)
 	if err != nil {
