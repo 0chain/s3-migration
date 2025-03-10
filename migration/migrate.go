@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -41,8 +42,10 @@ const (
 )
 
 const (
-	uploadCountFileName = "upload.count"
-	sourceDeleteFailed  = "source_delete.failed"
+	uploadCountFileName    = "upload.count"
+	sourceDeleteFailed     = "source_delete.failed"
+	downloadFailedFileName = "download.failed"
+	uploadFailedFileName   = "upload.failed"
 )
 
 const (
@@ -251,7 +254,7 @@ func InitMigration(mConfig *MigrationConfig) error {
 		return err
 	}
 	key := "objectKey"
-	if mConfig.Source == "google_drive" {
+	if mConfig.Source == "google_drive" || mConfig.Source == "box" {
 		key = "objectName"
 	}
 	if mConfig.Source == "onedrive" {
@@ -404,6 +407,14 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 	opCtx, opCtxCancel := context.WithCancel(ctx)
 	var files_count = 0
 	var totalSize int64
+
+	// Create failed downloads file
+	downloadFailedFile, err2 := os.OpenFile(filepath.Join(m.workDir, downloadFailedFileName), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err2 != nil {
+		zlogger.Logger.Error("Failed to create download failed file:", err2)
+	}
+	defer downloadFailedFile.Close()
+
 	for obj := range objCh {
 		zlogger.Logger.Info("Downloading object: ", obj.Key)
 		files_count++
@@ -440,12 +451,19 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 		go func() {
 			defer func(start time.Time) {
 				zlogger.Logger.Info("downloadObjMeta key:  ", downloadObjMeta.ObjectName, time.Since(start))
+				if err := m.logFileStatus(downloadObjMeta.ObjectName, downloadObjMeta.Size, "DOWNLOAD_COMPLETED", ""); err != nil {
+					zlogger.Logger.Error("Failed to log file status: ", err)
+				}
 			}(time.Now())
 
 			defer wg.Done()
 			err := checkIsFileExist(ctx, downloadObjMeta)
 			if err != nil {
 				zlogger.Logger.Error("check file error: ", err)
+				// Log failed download but continue
+				if _, writeErr := downloadFailedFile.WriteString(fmt.Sprintf("%s\t%s\n", downloadObjMeta.ObjectName, err.Error())); writeErr != nil {
+					zlogger.Logger.Error("Failed to write to download failed file:", writeErr)
+				}
 				migrator.SetMigrationError(err)
 				return
 			}
@@ -502,6 +520,13 @@ func (m *Migration) UploadWorker(ctx context.Context, migrator *MigrationWorker)
 		migrator.CloseUploadQueue()
 	}()
 
+	// Create failed uploads file
+	uploadFailedFile, err := os.OpenFile(filepath.Join(m.workDir, uploadFailedFileName), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		zlogger.Logger.Error("Failed to create upload failed file:", err)
+	}
+	defer uploadFailedFile.Close()
+
 	downloadQueue := migrator.GetDownloadQueue()
 	wg := &sync.WaitGroup{}
 	ops := make([]MigrationOperation, 0, m.batchSize)
@@ -520,7 +545,13 @@ func (m *Migration) UploadWorker(ctx context.Context, migrator *MigrationWorker)
 		err := checkDownloadStatus(downloadObj)
 		if err != nil {
 			zlogger.Logger.Error(err)
-			migrator.SetMigrationError(err)
+			// Log failed upload but continue
+			if _, writeErr := uploadFailedFile.WriteString(fmt.Sprintf("%s\t%s\n", d.ObjectName, err.Error())); writeErr != nil {
+				zlogger.Logger.Error("Failed to write to upload failed file:", writeErr)
+			}
+			if err := m.logFileStatus(d.ObjectName, d.Size, "UPLOAD_FAILED", err.Error()); err != nil {
+				zlogger.Logger.Error("Failed to log file status: ", err)
+			}
 			continue
 		}
 		if downloadObj.IsFileAlreadyExist {
@@ -528,13 +559,22 @@ func (m *Migration) UploadWorker(ctx context.Context, migrator *MigrationWorker)
 			case Skip:
 				migrator.UploadStart(uploadObj)
 				migrator.UploadDone(uploadObj, nil)
+				if err := m.logFileStatus(d.ObjectName, d.Size, "UPLOAD_SKIPPED", "File already exists"); err != nil {
+					zlogger.Logger.Error("Failed to log file status: ", err)
+				}
 				continue
 			}
 		}
 		op, err := processOperation(ctx, downloadObj)
 		if err != nil {
 			zlogger.Logger.Error(err)
-			migrator.SetMigrationError(err)
+			// Log failed upload but continue
+			if _, writeErr := uploadFailedFile.WriteString(fmt.Sprintf("%s\t%s\n", d.ObjectName, err.Error())); writeErr != nil {
+				zlogger.Logger.Error("Failed to write to upload failed file:", writeErr)
+			}
+			if err := m.logFileStatus(d.ObjectName, d.Size, "UPLOAD_FAILED", err.Error()); err != nil {
+				zlogger.Logger.Error("Failed to log file status: ", err)
+			}
 			continue
 		}
 		op.uploadObj = uploadObj
@@ -550,6 +590,9 @@ func (m *Migration) UploadWorker(ctx context.Context, migrator *MigrationWorker)
 			}(processOps)
 			totalSize = 0
 			time.Sleep(1 * time.Second)
+		}
+		if err := m.logFileStatus(d.ObjectName, d.Size, "UPLOAD_COMPLETED", ""); err != nil {
+			zlogger.Logger.Error("Failed to log file status: ", err)
 		}
 	}
 	if len(ops) > 0 {
@@ -823,4 +866,38 @@ func (m *Migration) processChunkDownload(ctx context.Context, sw *util.StreamWri
 		}
 	}
 	migrator.DownloadDone(downloadObjMeta, "", nil)
+}
+
+func (m *Migration) logFileStatus(objectName string, size int64, status string, message string) error {
+	logEntry := struct {
+		ObjectName string    `json:"object_name"`
+		Size       int64     `json:"size"`
+		Status     string    `json:"status"`
+		Message    string    `json:"message,omitempty"`
+		Time       time.Time `json:"timestamp"`
+	}{
+		ObjectName: objectName,
+		Size:       size,
+		Status:     status,
+		Message:    message,
+		Time:       time.Now(),
+	}
+
+	logFile := filepath.Join(m.workDir, "migration_status.log")
+	f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open log file: %v", err)
+	}
+	defer f.Close()
+
+	logJSON, err := json.Marshal(logEntry)
+	if err != nil {
+		return fmt.Errorf("failed to marshal log entry: %v", err)
+	}
+
+	if _, err := f.WriteString(string(logJSON) + "\n"); err != nil {
+		return fmt.Errorf("failed to write log entry: %v", err)
+	}
+
+	return nil
 }
