@@ -7,10 +7,10 @@ toolchain go1.23.1
 require (
 	cloud.google.com/go/storage v1.46.0
 	github.com/0chain/errors v1.0.3
-	github.com/0chain/gosdk v1.19.4
 	github.com/0chain/onedrive v1.1.1
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.4.1
-	github.com/0chain/gosdk_common v0.0.0-20250204070817-3c82b7ad6a9f
+	github.com/0chain/gosdk v1.19.11-0.20250318122237-b783aadb36b1
+	github.com/0chain/gosdk_common v0.0.0-20250318121140-c82820c54dea
 	github.com/aws/aws-sdk-go-v2 v1.17.1
 	github.com/aws/aws-sdk-go-v2/config v1.17.10
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.37
@@ -156,4 +156,4 @@ require (
 
 replace github.com/herumi/bls-go-binary => github.com/boddumanohar/bls-go-binary v1.30.8
 
-replace github.com/0chain/gosdk => github.com/0chain/egosdk v1.19.1-0.20250306194945-23dfbea21496
+replace github.com/0chain/gosdk => github.com/0chain/egosdk v1.19.1-0.20250318121802-ba628432aced
