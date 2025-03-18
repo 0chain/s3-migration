@@ -145,7 +145,6 @@ func (g *GoogleDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta
 						contentType = "d"
 						size = 0
 						zlogger.Logger.Info(fmt.Sprintf("Folder detected: %s, setting contentType to 'd' and size to 0", fileName))
-						return
 					} else if isGoogleDocsFile(file.MimeType) {
 						size = 0
 						zlogger.Logger.Info(fmt.Sprintf("Google Docs file detected: %s, setting size to 0", fileName))
