@@ -78,6 +78,8 @@ func updateFileInfo(file *drive.File) (string, string) {
 
 	// Handle Google Workspace files that need to be exported
 	switch file.MimeType {
+	case "application/vnd.google-apps.folder":
+		ext = "d"
 	case "application/vnd.google-apps.document":
 		ext = "txt"
 		if !strings.HasSuffix(fileName, ".txt") {
@@ -123,7 +125,6 @@ func (g *GoogleDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta
 			Fields("nextPageToken, files(id, mimeType, quotaBytesUsed, fileExtension, name, modifiedTime)").
 			PageSize(100)
 
-		// Process batch of files
 		processFiles := func(files []*drive.File) {
 			for _, file := range files {
 				lastModified, err := time.Parse(time.RFC3339, file.ModifiedTime)
@@ -132,17 +133,20 @@ func (g *GoogleDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta
 					continue
 				}
 
-				// Check if file meets time criteria
 				if (g.newerThan == nil || g.newerThan.Unix() == 0 || lastModified.Unix() >= g.newerThan.Unix()) &&
 					(g.olderThan == nil || g.olderThan.Unix() == 0 || lastModified.Unix() <= g.olderThan.Unix()) {
 
-					// Update extension and filename
 					ext, fileName := updateFileInfo(file)
 
-					// For Google Docs files, set the size to 0 since they'll be handled specially
 					size := file.QuotaBytesUsed
-					if isGoogleDocsFile(file.MimeType) {
-						// Set size to 0 for Google Docs files to avoid size mismatch issues
+					contentType := file.MimeType
+
+					if file.MimeType == "application/vnd.google-apps.folder" {
+						contentType = "d"
+						size = 0
+						zlogger.Logger.Info(fmt.Sprintf("Folder detected: %s, setting contentType to 'd' and size to 0", fileName))
+						return
+					} else if isGoogleDocsFile(file.MimeType) {
 						size = 0
 						zlogger.Logger.Info(fmt.Sprintf("Google Docs file detected: %s, setting size to 0", fileName))
 					}
@@ -150,7 +154,7 @@ func (g *GoogleDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta
 					objectChan <- &T.ObjectMeta{
 						Key:         file.Id,
 						Size:        size,
-						ContentType: file.MimeType,
+						ContentType: contentType,
 						Ext:         ext,
 						Name:        &fileName,
 					}
@@ -227,21 +231,45 @@ func (g *GoogleDriveClient) DeleteFile(ctx context.Context, fileID string) error
 }
 
 func (g *GoogleDriveClient) DownloadToFile(ctx context.Context, fileID string) (string, error) {
-	// Get file metadata first
 	file, err := g.service.Files.Get(fileID).Fields("name, mimeType").Do()
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get file metadata")
 	}
 
+	if file.MimeType == "application/vnd.google-apps.folder" {
+		fileName := file.Name
+		fileName = strings.ReplaceAll(fileName, "/", "_")
+		fileName = strings.ReplaceAll(fileName, "\\", "_")
+
+		folderPath := path.Join(g.workDir, fileName)
+
+		if err := os.MkdirAll(folderPath, 0755); err != nil {
+			return "", errors.Wrap(err, "failed to create folder directory")
+		}
+
+		placeholderPath := path.Join(folderPath, ".folder")
+		placeholder, err := os.Create(placeholderPath)
+		if err != nil {
+			return "", errors.Wrap(err, "failed to create folder placeholder")
+		}
+		defer placeholder.Close()
+
+		_, err = placeholder.WriteString(fmt.Sprintf("Google Drive Folder: %s\nID: %s\n", file.Name, fileID))
+		if err != nil {
+			return "", errors.Wrap(err, "failed to write folder metadata")
+		}
+
+		zlogger.Logger.Info(fmt.Sprintf("Created folder: %s", folderPath))
+		return folderPath, nil
+	}
+
 	var resp *http.Response
 	fileName := file.Name
 
-	// Sanitize the file name to ensure it's safe for the filesystem
 	fileName = strings.ReplaceAll(fileName, "/", "_")
 	fileName = strings.ReplaceAll(fileName, "\\", "_")
 	zlogger.Logger.Info("file.MimeType", file.MimeType)
 
-	// Handle Google Workspace files that need to be exported
 	switch file.MimeType {
 	case "application/vnd.google-apps.document":
 		resp, err = g.service.Files.Export(fileID, "text/plain").Download()
@@ -269,7 +297,6 @@ func (g *GoogleDriveClient) DownloadToFile(ctx context.Context, fileID string) (
 			fileName += ".json"
 		}
 	default:
-		// Regular file download
 		resp, err = g.service.Files.Get(fileID).Download()
 	}
 
@@ -281,12 +308,10 @@ func (g *GoogleDriveClient) DownloadToFile(ctx context.Context, fileID string) (
 	zlogger.Logger.Info(fmt.Sprintf("Original File Name: %s", fileName))
 	destinationPath := path.Join(g.workDir, fileName)
 
-	// Ensure work directory exists
 	if err := os.MkdirAll(g.workDir, 0755); err != nil {
 		return "", errors.Wrap(err, "failed to create work directory")
 	}
 
-	// Create output file
 	out, err := os.Create(destinationPath)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to create output file")
@@ -297,10 +322,8 @@ func (g *GoogleDriveClient) DownloadToFile(ctx context.Context, fileID string) (
 		}
 	}()
 
-	// Copy the content
 	written, err := io.Copy(out, resp.Body)
 	if err != nil {
-		// Attempt to remove the partially written file
 		os.Remove(destinationPath)
 		return "", errors.Wrap(err, "failed to write to output file")
 	}
@@ -310,28 +333,32 @@ func (g *GoogleDriveClient) DownloadToFile(ctx context.Context, fileID string) (
 }
 
 func (g *GoogleDriveClient) DownloadToMemory(ctx context.Context, fileID string, offset int64, chunkSize, fileSize int64) ([]byte, error) {
-	// Get the file metadata to check if it's a Google Docs file
 	file, err := g.service.Files.Get(fileID).Fields("mimeType, name").Do()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get file metadata: %v", err)
 	}
 
-	// Check if the file is a Google Docs file (Google Docs, Google Sheets, etc.)
+	if file.MimeType == "application/vnd.google-apps.folder" {
+		zlogger.Logger.Info(fmt.Sprintf("Folder detected: %s, downloading as placeholder", file.Name))
+		folderPath, err := g.DownloadToFile(ctx, fileID)
+		if err != nil {
+			return nil, fmt.Errorf("unable to process folder %s: %v", file.Name, err)
+		}
+		message := fmt.Sprintf("FOLDER:%s", folderPath)
+		return []byte(message), nil
+	}
+
 	if isGoogleDocsFile(file.MimeType) {
 		zlogger.Logger.Info(fmt.Sprintf("Google Docs file (%s) detected in DownloadToMemory, downloading to file", file.Name))
-		// For Google Docs, we need to directly use DownloadToFile and return a special message
 		filePath, err := g.DownloadToFile(ctx, fileID)
 		if err != nil {
 			return nil, fmt.Errorf("unable to export Google Docs file %s: %v", file.Name, err)
 		}
 
-		// Create a message that can be detected by the migration tool to indicate
-		// this was downloaded to a file instead of memory
 		message := fmt.Sprintf("FILE_DOWNLOADED:%s", filePath)
 		return []byte(message), nil
 	}
 
-	// Regular file download logic
 	limit := offset + chunkSize - 1
 	if limit > fileSize {
 		limit = fileSize
@@ -339,7 +366,6 @@ func (g *GoogleDriveClient) DownloadToMemory(ctx context.Context, fileID string,
 
 	rng := fmt.Sprintf("bytes=%d-%d", offset, limit)
 
-	// Perform the file download with the specified byte range
 	req := g.service.Files.Get(fileID)
 	req.Header().Set("Range", rng)
 
@@ -363,12 +389,14 @@ func (g *GoogleDriveClient) DownloadToMemory(ctx context.Context, fileID string,
 	return data, nil
 }
 
-// isGoogleDocsFile checks if the given MIME type represents a Google Docs file
 func isGoogleDocsFile(mimeType string) bool {
+	if mimeType == "application/vnd.google-apps.folder" {
+		return false
+	}
+
 	return strings.HasPrefix(mimeType, "application/vnd.google-apps.")
 }
 
-// getExportMimeType returns the appropriate export MIME type for a Google Docs file
 func getExportMimeType(mimeType string) string {
 	switch mimeType {
 	case "application/vnd.google-apps.document":
@@ -386,15 +414,11 @@ func getExportMimeType(mimeType string) string {
 	}
 }
 
-// ShouldDownloadToFile determines if a file should be downloaded using DownloadToFile
-// rather than DownloadToMemory
 func ShouldDownloadToFile(mimeType string) bool {
-	// Check if it's a Google Docs file
 	if isGoogleDocsFile(mimeType) {
 		return true
 	}
 
-	// Add any other MIME types that should be downloaded to file
 	complexBinaryTypes := []string{
 		"application/pdf",
 		"application/vnd.openxmlformats",
@@ -410,4 +434,8 @@ func ShouldDownloadToFile(mimeType string) bool {
 	}
 
 	return false
+}
+
+func IsFolder(mimeType string) bool {
+	return mimeType == "application/vnd.google-apps.folder"
 }
