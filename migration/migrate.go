@@ -449,9 +449,8 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 	}
 
 	listingTime := time.Since(downloadStartTime)
-	estimatedDownloadTime := listingTime * time.Duration(totalCount)
-	estimatedTotalTime := estimatedDownloadTime * 20
-
+	estimatedlistingTime := listingTime *  time.Duration(totalCount)
+	estimatedTotalTime := estimatedlistingTime *2
 	go func() {
 		migrationTimeFilePath := filepath.Join(m.workDir, "migration_time.txt")
 		estimateStr := fmt.Sprintf("Estimated time: %v\nFiles to process: %d\nTotal size: %d bytes",
