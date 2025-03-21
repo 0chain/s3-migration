@@ -122,8 +122,42 @@ func (g *GoogleDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta
 
 		filesReq := g.service.Files.List().Context(ctx).
 			Q("trashed=false").
-			Fields("nextPageToken, files(id, mimeType, quotaBytesUsed, fileExtension, name, modifiedTime)").
+			Fields("nextPageToken, files(id, mimeType, quotaBytesUsed, fileExtension, name, modifiedTime, parents)").
 			PageSize(100)
+
+		getParentFolderName := func(parentID string) (string, error) {
+			folder, err := g.service.Files.Get(parentID).Fields("name").Do()
+			if err != nil {
+				return "", err
+			}
+			return folder.Name, nil
+		}
+
+		getFullPath := func(file *drive.File) (string, error) {
+			var path []string
+			for {
+				if len(file.Parents) == 0 {
+					break
+				}
+
+				parentID := file.Parents[0]
+				parentName, err := getParentFolderName(parentID)
+				if err != nil {
+					return "", err
+				}
+
+				path = append([]string{parentName}, path...)
+
+				parentFile, err := g.service.Files.Get(parentID).Fields("id, parents").Do()
+				if err != nil {
+					return "", err
+				}
+
+				file = parentFile
+			}
+
+			return strings.Join(path, "/"), nil
+		}
 
 		processFiles := func(files []*drive.File) {
 			for _, file := range files {
@@ -134,20 +168,22 @@ func (g *GoogleDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta
 				}
 
 				if (g.newerThan == nil || g.newerThan.Unix() == 0 || lastModified.Unix() >= g.newerThan.Unix()) &&
-					(g.olderThan == nil || g.olderThan.Unix() == 0 || lastModified.Unix() <= g.olderThan.Unix()) {
+					(g.olderThan == nil || g.olderThan.Unix() == 0 || lastModified.Unix() <= g.olderThan.Unix()) &&
+					(file.MimeType != "application/vnd.google-apps.folder") {
 
 					ext, fileName := updateFileInfo(file)
 
 					size := file.QuotaBytesUsed
 					contentType := file.MimeType
-
-					if file.MimeType == "application/vnd.google-apps.folder" {
-						contentType = "d"
-						size = 0
-						zlogger.Logger.Info(fmt.Sprintf("Folder detected: %s, setting contentType to 'd' and size to 0", fileName))
-					} else if isGoogleDocsFile(file.MimeType) {
+					if isGoogleDocsFile(file.MimeType) {
 						size = 0
 						zlogger.Logger.Info(fmt.Sprintf("Google Docs file detected: %s, setting size to 0", fileName))
+					}
+
+					fullPath, err := getFullPath(file)
+					if err != nil {
+						zlogger.Logger.Error(fmt.Sprintf("Error getting full path: %v", err))
+						continue
 					}
 
 					objectChan <- &T.ObjectMeta{
@@ -156,12 +192,12 @@ func (g *GoogleDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta
 						ContentType: contentType,
 						Ext:         ext,
 						Name:        &fileName,
+						ParentPath:  &fullPath,
 					}
 				}
 			}
 		}
 
-		// Get first page
 		files, err := filesReq.Do()
 		if err != nil {
 			errChan <- err
@@ -170,7 +206,6 @@ func (g *GoogleDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta
 
 		processFiles(files.Files)
 
-		// Continue with next pages if any
 		nextPageToken := files.NextPageToken
 		for nextPageToken != "" {
 			files, err := filesReq.PageToken(nextPageToken).Do()

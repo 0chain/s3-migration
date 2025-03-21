@@ -398,7 +398,7 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 	var allObjects []*T.ObjectMeta
 	var totalCount int
 	var totalSize int64
-	nameCount := make(map[string]int) 
+	nameMap := make(map[string]bool) // Track existing names
 
 	downloadFailedFile, err2 := os.OpenFile(filepath.Join(m.workDir, downloadFailedFileName), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err2 != nil {
@@ -409,14 +409,17 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 	objCh, errCh := migration.dataSourceStore.ListFiles(rootContext)
 
 	for obj := range objCh {
-		// for drive default files
 		baseName := getValueBasedOnKey("objectName", migration.key, *obj)
-		if _, exists := nameCount[baseName]; exists {
-			nameCount[baseName]++
-			newName := fmt.Sprintf("%s_%d", baseName, nameCount[baseName])
-			obj.Name = &newName 
+		if _, exists := nameMap[baseName]; exists {
+			h := sha1.New()
+			uniqueInput := fmt.Sprintf("%s-%s-%d", obj.Key, baseName, time.Now().UnixNano())
+			h.Write([]byte(uniqueInput))
+			uniqueSuffix := hex.EncodeToString(h.Sum(nil))[:8] // Use first 8 chars of hash
+
+			newName := fmt.Sprintf("%s_%s", baseName, uniqueSuffix)
+			obj.Name = &newName
 		} else {
-			nameCount[baseName] = 1 
+			nameMap[baseName] = true
 		}
 
 		allObjects = append(allObjects, obj)
@@ -495,6 +498,7 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 			DoneChan:   make(chan struct{}, 1),
 			ErrChan:    make(chan error, 1),
 			mimeType:   obj.ContentType,
+			ParentPath: *&obj.ParentPath,
 		}
 
 		wg.Add(1)
@@ -538,7 +542,7 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 	}
 
 	downloadTime := time.Since(downloadStartTime)
-	estimatedRemainingTime := downloadTime * 5
+	estimatedRemainingTime := downloadTime * 2
 	totalEstimatedTime := downloadTime + estimatedRemainingTime
 
 	go func() {
@@ -669,12 +673,20 @@ func getUniqueShortObjKey(objectKey string) string {
 	return objectKey
 }
 
-func getRemotePath(objectKey string) string {
-	return path.Join(migration.migrateTo, migration.bucket, getUniqueShortObjKey(objectKey))
+func getRemotePath(objectKey string, parentPath interface{}) string {
+	var fullPath string
+
+	if parentPathStr, ok := parentPath.(*string); ok && parentPathStr != nil && *parentPathStr != "" {
+		fullPath = path.Join(migration.migrateTo, migration.bucket, *parentPathStr, getUniqueShortObjKey(objectKey))
+	} else {
+		fullPath = path.Join(migration.migrateTo, migration.bucket, getUniqueShortObjKey(objectKey))
+	}
+
+	return fullPath
 }
 
 func checkIsFileExist(ctx context.Context, downloadObj *DownloadObjectMeta) error {
-	remotePath := getRemotePath(downloadObj.ObjectName)
+	remotePath := getRemotePath(downloadObj.ObjectName, downloadObj.ParentPath)
 
 	var isFileExist bool
 	err := util.Retry(3, time.Second*5, func() error {
@@ -707,7 +719,7 @@ func processOperation(ctx context.Context, downloadObj *DownloadObjectMeta) (Mig
 		zlogger.Logger.Info("uploading object key:  ", downloadObj.ObjectName, time.Since(start))
 	}(time.Now())
 
-	remotePath := getRemotePath(downloadObj.ObjectName)
+	remotePath := getRemotePath(downloadObj.ObjectName, downloadObj.ParentPath)
 	var op MigrationOperation
 	fileObj, err := migration.fs.Open(downloadObj.LocalPath)
 	if err != nil {
@@ -743,7 +755,7 @@ func processOperation(ctx context.Context, downloadObj *DownloadObjectMeta) (Mig
 }
 
 func processOperationForMemory(ctx context.Context, downloadObj *DownloadObjectMeta, r io.Reader) (MigrationOperation, error) {
-	remotePath := getRemotePath(downloadObj.ObjectName)
+	remotePath := getRemotePath(downloadObj.ObjectName, downloadObj.ParentPath)
 	var op MigrationOperation
 	mimeType := downloadObj.mimeType
 	var fileOperation sdk.OperationRequest

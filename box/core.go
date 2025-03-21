@@ -130,112 +130,150 @@ func (d *BoxClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta, <-chan
 			close(errChan)
 		}()
 
-		folderID := "0" // root folder
-		limit := 100
-		offset := 0
+		// Create a queue of folder IDs to process
+		folderQueue := []string{"0"} // Start with root folder
 
-		for {
-			select {
-			case <-ctx.Done():
-				errChan <- ctx.Err()
-				return
-			default:
-				// Continue processing
-			}
+		for len(folderQueue) > 0 {
+			// Get next folder to process
+			folderID := folderQueue[0]
+			folderQueue = folderQueue[1:] // Remove processed folder
 
-			url := fmt.Sprintf("%s/folders/%s/items?limit=%d&offset=%d&fields=id,name,size,modified_at,extension,mime_type",
-				apiBaseUrl, folderID, limit, offset)
+			offset := 0
+			limit := 100
 
-			req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-			if err != nil {
-				errChan <- err
-				return
-			}
-
-			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", d.AccessToken))
-
-			resp, err := http.DefaultClient.Do(req)
-			if err != nil {
-				errChan <- err
-				return
-			}
-
-			// if token is expired, refresh it
-			if resp.StatusCode == http.StatusUnauthorized {
-				err := RefreshToken(ctx, d)
-				if err != nil {
-					errChan <- fmt.Errorf("failed to refresh token: %w", err)
+			for {
+				select {
+				case <-ctx.Done():
+					errChan <- ctx.Err()
 					return
+				default:
+					// Continue processing
 				}
 
-				// Retry the request with the new access token
-				req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", d.AccessToken))
-				resp, err = http.DefaultClient.Do(req)
+				url := fmt.Sprintf("%s/folders/%s/items?limit=%d&offset=%d&fields=id,name,size,modified_at,extension,mime_type,parent,path_collection,type",
+					apiBaseUrl, folderID, limit, offset)
+
+				req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 				if err != nil {
 					errChan <- err
 					return
 				}
-			}
 
-			if resp.StatusCode != http.StatusOK {
-				errMsg := fmt.Sprintf("failed to list files: %s", resp.Status)
-				resp.Body.Close()
-				errChan <- fmt.Errorf(errMsg)
-				return
-			}
+				req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", d.AccessToken))
 
-			var result struct {
-				TotalCount int `json:"total_count"`
-				Entries    []struct {
-					ID         string `json:"id"`
-					Name       string `json:"name"`
-					Size       int64  `json:"size"`
-					ModifiedAt string `json:"modified_at"`
-					Extension  string `json:"extension,omitempty"`
-					MimeType   string `json:"mime_type,omitempty"`
-				} `json:"entries"`
-				Offset int `json:"offset"`
-				Limit  int `json:"limit"`
-			}
-
-			err = json.NewDecoder(resp.Body).Decode(&result)
-			resp.Body.Close()
-			if err != nil {
-				errChan <- err
-				return
-			}
-
-			for _, item := range result.Entries {
-				lastModified, err := time.Parse(time.RFC3339, item.ModifiedAt)
+				resp, err := http.DefaultClient.Do(req)
 				if err != nil {
-					zlogger.Logger.Error(err)
-					continue
+					errChan <- err
+					return
 				}
 
-				// Apply date filtering
-				if (d.NewerThan == nil || d.NewerThan.Unix() == 0 || lastModified.Unix() >= d.NewerThan.Unix()) &&
-					(d.OlderThan == nil || d.OlderThan.Unix() == 0 || lastModified.Unix() <= d.OlderThan.Unix()) {
+				// if token is expired, refresh it
+				if resp.StatusCode == http.StatusUnauthorized {
+					err := RefreshToken(ctx, d)
+					if err != nil {
+						errChan <- fmt.Errorf("failed to refresh token: %w", err)
+						return
+					}
 
-					// Use non-blocking send with timeout to prevent hanging
-					select {
-					case objectChan <- &T.ObjectMeta{
-						Key:         item.ID,
-						Size:        item.Size,
-						ContentType: item.MimeType,
-						Ext:         item.Extension,
-						Name:        &item.Name,
-					}:
-					case <-ctx.Done():
-						errChan <- ctx.Err()
+					// Retry the request with the new access token
+					req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", d.AccessToken))
+					resp, err = http.DefaultClient.Do(req)
+					if err != nil {
+						errChan <- err
 						return
 					}
 				}
-			}
 
-			if len(result.Entries) == 0 || len(result.Entries) < limit {
-				break
+				if resp.StatusCode != http.StatusOK {
+					errMsg := fmt.Sprintf("failed to list files: %s", resp.Status)
+					resp.Body.Close()
+					errChan <- fmt.Errorf(errMsg)
+					return
+				}
+
+				var result struct {
+					TotalCount int `json:"total_count"`
+					Entries    []struct {
+						ID         string `json:"id"`
+						Name       string `json:"name"`
+						Size       int64  `json:"size"`
+						ModifiedAt string `json:"modified_at"`
+						Extension  string `json:"extension,omitempty"`
+						MimeType   string `json:"mime_type,omitempty"`
+						Type       string `json:"type"`
+						Parent     struct {
+							ID   string `json:"id"`
+							Name string `json:"name"`
+							Path string `json:"path_collection"`
+						} `json:"parent"`
+						PathCollection struct {
+							TotalCount int `json:"total_count"`
+							Entries    []struct {
+								ID   string `json:"id"`
+								Name string `json:"name"`
+							} `json:"entries"`
+						} `json:"path_collection"`
+					} `json:"entries"`
+					Offset int `json:"offset"`
+					Limit  int `json:"limit"`
+				}
+
+				err = json.NewDecoder(resp.Body).Decode(&result)
+				resp.Body.Close()
+				if err != nil {
+					errChan <- err
+					return
+				}
+
+				for _, item := range result.Entries {
+					// If it's a folder, add it to the queue
+					if item.Type == "folder" {
+						folderQueue = append(folderQueue, item.ID)
+						continue
+					}
+
+					lastModified, err := time.Parse(time.RFC3339, item.ModifiedAt)
+					if err != nil {
+						zlogger.Logger.Error(err)
+						continue
+					}
+
+					// Apply date filtering
+					if (d.NewerThan == nil || d.NewerThan.Unix() == 0 || lastModified.Unix() >= d.NewerThan.Unix()) &&
+						(d.OlderThan == nil || d.OlderThan.Unix() == 0 || lastModified.Unix() <= d.OlderThan.Unix()) {
+
+						var parentPath string
+						if item.PathCollection.TotalCount > 0 {
+							pathParts := make([]string, 0, item.PathCollection.TotalCount)
+							for _, entry := range item.PathCollection.Entries {
+								if entry.ID != "0" { // Skip root folder
+									pathParts = append(pathParts, entry.Name)
+								}
+							}
+							parentPath = strings.Join(pathParts, "/")
+						}
+
+						select {
+						case objectChan <- &T.ObjectMeta{
+							Key:         item.ID,
+							Size:        item.Size,
+							ContentType: item.MimeType,
+							Ext:         item.Extension,
+							Name:        &item.Name,
+							ParentPath:  &parentPath,
+						}:
+						case <-ctx.Done():
+							errChan <- ctx.Err()
+							return
+						}
+					}
+				}
+
+				if len(result.Entries) == 0 || len(result.Entries) < limit {
+					break // No more items in this folder
+				}
+				offset += len(result.Entries)
 			}
-			offset += len(result.Entries)
 		}
 	}()
 

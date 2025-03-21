@@ -76,15 +76,27 @@ func (g *GoogleCloudClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta
 			lastModified := attrs.Updated
 			if (g.newerThan == nil || g.newerThan.Unix() == 0 || lastModified.Unix() >= g.newerThan.Unix()) &&
 				(g.olderThan == nil || g.olderThan.Unix() == 0 || lastModified.Unix() <= g.olderThan.Unix()) {
+
+				if strings.HasSuffix(attrs.Name, "/") {
+					zlogger.Logger.Info(fmt.Sprintf("Skipping folder: %s", attrs.Name))
+					continue
+				}
+
+				// pathParts := strings.Split(attrs.Name, "/")
+				// var fullPath string
+				// if len(pathParts) > 1 {
+				// 	fullPath = strings.Join(pathParts[:len(pathParts)-1], "/")
+				// }
+
 				objectChan <- &T.ObjectMeta{
 					Key:         attrs.Name,
 					Size:        attrs.Size,
 					ContentType: attrs.ContentType,
 					Ext:         path.Ext(attrs.Name),
+					// ParentPath:  &fullPath,
 				}
 			}
 		}
-
 	}()
 
 	return objectChan, errChan
