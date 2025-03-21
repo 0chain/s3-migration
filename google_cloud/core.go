@@ -82,12 +82,6 @@ func (g *GoogleCloudClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta
 					continue
 				}
 
-				// pathParts := strings.Split(attrs.Name, "/")
-				// var fullPath string
-				// if len(pathParts) > 1 {
-				// 	fullPath = strings.Join(pathParts[:len(pathParts)-1], "/")
-				// }
-
 				objectChan <- &T.ObjectMeta{
 					Key:         attrs.Name,
 					Size:        attrs.Size,
