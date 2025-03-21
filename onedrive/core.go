@@ -125,9 +125,6 @@ func (g *OneDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta, <
 					mimeType = entry.File.MIMEType
 				}
 
-				if entry.Size == 0 && !isDefaultFile(mimeType) {
-					continue
-				}
 
 				lastModified, err := time.Parse(time.RFC3339, entry.LastModified)
 				if err != nil {
