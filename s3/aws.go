@@ -10,7 +10,7 @@ import (
 
 	T "github.com/0chain/s3migration/types"
 
-	"github.com/0chain/gosdk/core/encryption"
+	"github.com/0chain/gosdk_common/core/encryption"
 	zlogger "github.com/0chain/s3migration/logger"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"

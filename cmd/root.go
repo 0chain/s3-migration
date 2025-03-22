@@ -7,18 +7,19 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/0chain/gosdk/core/client"
+	"github.com/0chain/gosdk_common/core/client"
+	"github.com/0chain/gosdk_common/zboxcore/commonsdk"
 
-	"github.com/0chain/gosdk/core/conf"
-	"github.com/0chain/gosdk/core/logger"
+	"github.com/0chain/gosdk_common/core/conf"
+	"github.com/0chain/gosdk_common/core/logger"
 	"github.com/0chain/s3migration/util"
 
 	"github.com/spf13/cobra"
 
-	"github.com/0chain/gosdk/core/zcncrypto"
+	"github.com/0chain/gosdk_common/core/zcncrypto"
 
 	"github.com/0chain/gosdk/zboxcore/sdk"
-	"github.com/0chain/gosdk/zcncore"
+	"github.com/0chain/gosdk_common/zcncore"
 	zlogger "github.com/0chain/s3migration/logger"
 )
 
@@ -80,8 +81,7 @@ func initConfig() {
 	}
 
 	// syncing loggers
-	logger.SyncLoggers([]*logger.Logger{zcncore.GetLogger(), sdk.GetLogger()})
-
+	logger.SyncLoggers([]*logger.Logger{zcncore.GetLogger(), commonsdk.GetLogger()})
 	exePath, err := os.Executable()
 	if err != nil {
 		fmt.Printf("Error getting executable path: %v\n", err)
@@ -91,15 +91,14 @@ func initConfig() {
 	exeDir := filepath.Dir(exePath)
 
 	cmdLogFilePath := filepath.Join(exeDir, "cmdlog.log")
-	// get parent of workDir 
+	// get parent of workDir
 	parentDir := filepath.Dir(workDir)
 	s3MigrationLogFilePath := filepath.Join(parentDir, "s3migration.log")
-	sdk.SetLogFile(s3MigrationLogFilePath, !bSilent)
+	commonsdk.SetLogFile(s3MigrationLogFilePath, !bSilent)
 	zlogger.SetLogFile(s3MigrationLogFilePath, !bSilent)
 	// log workdir
 	fmt.Println("Workdir: ", workDir)
 	zcncore.SetLogFile(cmdLogFilePath, !bSilent)
-
 
 	err = client.Init(context.Background(), conf.Config{
 		ChainID:         cfg.ChainID,

@@ -3,7 +3,7 @@ package zlogger
 import (
 	"os"
 
-	"github.com/0chain/gosdk/core/logger"
+	"github.com/0chain/gosdk_common/core/logger"
 )
 
 var defaultLogLevel = logger.DEBUG
