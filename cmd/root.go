@@ -91,15 +91,14 @@ func initConfig() {
 	exeDir := filepath.Dir(exePath)
 
 	cmdLogFilePath := filepath.Join(exeDir, "cmdlog.log")
-	// get parent of workDir 
+	// get parent of workDir
 	parentDir := filepath.Dir(workDir)
 	s3MigrationLogFilePath := filepath.Join(parentDir, "s3migration.log")
 	sdk.SetLogFile(s3MigrationLogFilePath, !bSilent)
 	zlogger.SetLogFile(s3MigrationLogFilePath, !bSilent)
 	// log workdir
-	fmt.Println("Workdir: ", workDir)
+	zlogger.Logger.Info("Workdir: ", workDir)
 	zcncore.SetLogFile(cmdLogFilePath, !bSilent)
-
 
 	err = client.Init(context.Background(), conf.Config{
 		ChainID:         cfg.ChainID,
