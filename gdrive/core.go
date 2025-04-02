@@ -122,7 +122,7 @@ func (g *GoogleDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta
 
 		filesReq := g.service.Files.List().Context(ctx).
 			Q("trashed=false").
-			Fields("nextPageToken, files(id, mimeType, quotaBytesUsed, fileExtension, name, modifiedTime, parents)").
+			Fields("nextPageToken, files(id, mimeType, quotaBytesUsed, fileExtension, name, modifiedTime, parents, size)").
 			PageSize(100)
 
 		getParentFolderName := func(parentID string) (string, error) {
