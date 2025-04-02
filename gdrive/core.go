@@ -25,6 +25,8 @@ type GoogleDriveClient struct {
 	olderThan *time.Time
 }
 
+const emptyFileHash = "d41d8cd98f00b204e9800998ecf8427e"
+
 func NewGoogleDriveClient(cfg oauth2.Config, token *oauth2.Token, workDir string, newerThan *time.Time, olderThan *time.Time) (*GoogleDriveClient, error) {
 	ctx := context.Background()
 	var httpClient *http.Client
@@ -442,7 +444,6 @@ func (g *GoogleDriveClient) DownloadFile(ctx context.Context, fileID string, w *
 
 	fileName = strings.ReplaceAll(fileName, "/", "_")
 	fileName = strings.ReplaceAll(fileName, "\\", "_")
-	zlogger.Logger.Info("file.MimeType", file.MimeType)
 
 	switch file.MimeType {
 	case "application/vnd.google-apps.document":
@@ -484,6 +485,13 @@ func (g *GoogleDriveClient) DownloadFile(ctx context.Context, fileID string, w *
 	if err != nil {
 		w.CloseWithError(err)
 		return err
+	}
+	if written == 0 {
+		_, err = w.Write([]byte(emptyFileHash))
+		if err != nil {
+			w.CloseWithError(err)
+			return err
+		}
 	}
 	if err := w.Close(); err != nil {
 		return err
