@@ -489,7 +489,7 @@ func (g *GoogleDriveClient) DownloadFile(ctx context.Context, fileID string, w *
 		return err
 	}
 
-	zlogger.Logger.Info(fmt.Sprintf("Downloaded file ID: %s (%d bytes)", fileID, written))
+	zlogger.Logger.Info(fmt.Sprintf("Downloaded file: %s (%d bytes)", fileName, written))
 	return nil
 }
 
