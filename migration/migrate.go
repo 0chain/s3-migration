@@ -449,8 +449,8 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 	}
 
 	listingTime := time.Since(downloadStartTime)
-	estimatedlistingTime := listingTime *  time.Duration(totalCount)
-	estimatedTotalTime := estimatedlistingTime *2
+	estimatedlistingTime := listingTime * time.Duration(totalCount)
+	estimatedTotalTime := estimatedlistingTime * 2
 	go func() {
 		migrationTimeFilePath := filepath.Join(m.workDir, "migration_time.txt")
 		estimateStr := fmt.Sprintf("Estimated time: %v\nFiles to process: %d\nTotal size: %d bytes",
@@ -520,12 +520,24 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 				migrator.SetMigrationError(err)
 				return
 			}
+			var op MigrationOperation
+			gdrive, ok := migration.dataSourceStore.(*gdrive.GoogleDriveClient)
+			if ok {
+				r, w := io.Pipe()
+				go func() {
+					migrator.DownloadStart(downloadObjMeta)
+					zlogger.Logger.Info("Downloading object: ", downloadObjMeta.ObjectName)
+					derr := gdrive.DownloadFile(opCtx, objMeta.ObjectKey, w)
+					migrator.DownloadDone(downloadObjMeta, "", derr)
+				}()
+				op, _ = processOperationForMemory(ctx, objMeta, r)
+			} else {
+				dataChan := make(chan *util.DataChan, 200)
+				streamWriter := util.NewStreamWriter(dataChan)
+				go m.processChunkDownload(opCtx, streamWriter, migrator, objMeta)
+				op, _ = processOperationForMemory(ctx, objMeta, streamWriter)
+			}
 
-			dataChan := make(chan *util.DataChan, 200)
-			streamWriter := util.NewStreamWriter(dataChan)
-			go m.processChunkDownload(opCtx, streamWriter, migrator, objMeta)
-
-			op, _ := processOperationForMemory(ctx, objMeta, streamWriter)
 			opLock.Lock()
 			ops = append(ops, op)
 			opLock.Unlock()

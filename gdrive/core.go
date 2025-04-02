@@ -173,7 +173,7 @@ func (g *GoogleDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta
 
 					ext, fileName := updateFileInfo(file)
 
-					size := file.QuotaBytesUsed
+					size := file.Size
 					contentType := file.MimeType
 					if isGoogleDocsFile(file.MimeType) {
 						size = 0
@@ -421,6 +421,76 @@ func (g *GoogleDriveClient) DownloadToMemory(ctx context.Context, fileID string,
 	}
 
 	return data, nil
+}
+
+func (g *GoogleDriveClient) DownloadFile(ctx context.Context, fileID string, w *io.PipeWriter) error {
+	file, err := g.service.Files.Get(fileID).Fields("name, mimeType").Do()
+	if err != nil {
+		w.CloseWithError(err)
+		return errors.Wrap(err, "failed to get file metadata")
+	}
+
+	if file.MimeType == "application/vnd.google-apps.folder" {
+		fileName := file.Name
+		fileName = strings.ReplaceAll(fileName, "/", "_")
+		fileName = strings.ReplaceAll(fileName, "\\", "_")
+		return errors.New("cannot download folder: " + fileName)
+	}
+
+	var resp *http.Response
+	fileName := file.Name
+
+	fileName = strings.ReplaceAll(fileName, "/", "_")
+	fileName = strings.ReplaceAll(fileName, "\\", "_")
+	zlogger.Logger.Info("file.MimeType", file.MimeType)
+
+	switch file.MimeType {
+	case "application/vnd.google-apps.document":
+		resp, err = g.service.Files.Export(fileID, "text/plain").Context(ctx).Download()
+		if !strings.HasSuffix(fileName, ".txt") {
+			fileName += ".txt"
+		}
+	case "application/vnd.google-apps.spreadsheet":
+		resp, err = g.service.Files.Export(fileID, "text/csv").Context(ctx).Download()
+		if !strings.HasSuffix(fileName, ".csv") {
+			fileName += ".csv"
+		}
+	case "application/vnd.google-apps.presentation":
+		resp, err = g.service.Files.Export(fileID, "text/plain").Context(ctx).Download()
+		if !strings.HasSuffix(fileName, ".txt") {
+			fileName += ".txt"
+		}
+	case "application/vnd.google-apps.drawing":
+		resp, err = g.service.Files.Export(fileID, "image/png").Context(ctx).Download()
+		if !strings.HasSuffix(fileName, ".png") {
+			fileName += ".png"
+		}
+	case "application/vnd.google-apps.script":
+		resp, err = g.service.Files.Export(fileID, "application/json").Context(ctx).Download()
+		if !strings.HasSuffix(fileName, ".json") {
+			fileName += ".json"
+		}
+	default:
+		resp, err = g.service.Files.Get(fileID).Context(ctx).Download()
+	}
+
+	if err != nil {
+		w.CloseWithError(err)
+		return errors.Wrap(err, "failed to download file")
+	}
+	defer resp.Body.Close()
+
+	written, err := io.Copy(w, resp.Body)
+	if err != nil {
+		w.CloseWithError(err)
+		return err
+	}
+	if err := w.Close(); err != nil {
+		return err
+	}
+
+	zlogger.Logger.Info(fmt.Sprintf("Downloaded file ID: %s (%d bytes)", fileID, written))
+	return nil
 }
 
 func isGoogleDocsFile(mimeType string) bool {
