@@ -50,7 +50,7 @@ jobs:
       - name: Install Dependencies
         shell: powershell
         run: |
-          choco install -y make wget unzip docker-cli
+          choco install -y make wget unzip docker-desktop docker-cli
       
       - name: Start Docker Service
         shell: powershell
