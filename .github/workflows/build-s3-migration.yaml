@@ -47,11 +47,6 @@ jobs:
             echo "TAG=v0.0.0-$branch" | Out-File -FilePath $env:GITHUB_ENV -Append
           }
       
-      - name: Reboot Windows Runner
-        shell: powershell
-        run: |
-          Restart-Computer -Force
-      
       - name: Install Dependencies
         shell: powershell
         run: |
