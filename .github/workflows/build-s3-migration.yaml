@@ -52,10 +52,24 @@ jobs:
         run: |
           choco install -y make wget unzip docker-desktop
       
+      - name: Refresh Environment Variables
+        shell: powershell
+        run: |
+          refreshenv
+      
+      # - name: Check if Docker is Running
+      #   shell: powershell
+      #   run: |
+      #     $dockerStatus = Get-Process -Name "Docker Desktop" -ErrorAction SilentlyContinue
+      #     if ($dockerStatus -eq $null) {
+      #       Start-Process -FilePath "C:\Program Files\Docker\Docker\Docker Desktop.exe" -Verb RunAs
+      #     } else {
+      #       Write-Output "Docker is already running."
+      #     }
+      
       - name: Start Docker Service
         shell: powershell
         run: |
-          Start-Sleep -Seconds 30
           Start-Service docker
           docker version
 
