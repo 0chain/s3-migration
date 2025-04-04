@@ -27,14 +27,14 @@ jobs:
 
       - name: Get Branch
         id: get_branch
-        shell: pwsh
+        shell: powershell
         run: |
           $BRANCH = "${{ github.ref }}".Replace("refs/heads/", "").Replace("/", "-")
           echo "BRANCH=$BRANCH" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo $BRANCH
       
       - name: Set GITHUB_ENV
-        shell: pwsh
+        shell: powershell
         run: |
           $branch = "${{ github.ref }}"
           if ($branch -eq "refs/heads/master") {
@@ -48,24 +48,24 @@ jobs:
           }
       
       - name: Install Dependencies
-        shell: pwsh
+        shell: powershell
         run: |
           choco install -y make wget unzip docker-cli
       
       - name: Start Docker Service
-        shell: pwsh
+        shell: powershell
         run: |
           Start-Service docker
           docker version
 
       - name: Build Project Using Docker
-        shell: pwsh
+        shell: powershell
         run: |
           docker run --rm -v ${PWD}:/s3mgrt --workdir=/s3mgrt golang:1.22.5 make build
 
       - name: Install AWS CLI
         if: github.ref == 'refs/heads/staging'
-        shell: pwsh
+        shell: powershell
         run: |
           Invoke-WebRequest -Uri "https://awscli.amazonaws.com/AWSCLIV2.msi" -OutFile "AWSCLIV2.msi"
           Start-Process msiexec.exe -ArgumentList "/i AWSCLIV2.msi /quiet /norestart" -NoNewWindow -Wait
@@ -82,16 +82,3 @@ jobs:
         run: |
           box-client-id=${{ secrets.BOX_CLIENT_ID }}
           box-client-secret=${{ secrets.BOX_CLIENT_SECRET }}
-      
-      - name: Push to AWS S3
-        if: github.ref == 'refs/heads/staging'
-        shell: pwsh
-        run: |
-          aws s3 cp s3mgrt s3://${{ secrets.S3_MGRT_BINARY_BUCKET }}/s3mgrt
-      
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: s3mgrt-windows
-          path: s3mgrt.exe
-          retention-days: 5
