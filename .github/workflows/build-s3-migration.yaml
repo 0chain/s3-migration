@@ -51,14 +51,14 @@ jobs:
         shell: powershell
         run: |
           choco install -y make wget unzip docker-desktop
-          Start-Process -NoNewWindow -Wait -FilePath "C:\Program Files\Docker\Docker"
       
-      - name: Wait for Docker to Start
+      - name: Start Docker Service
         shell: powershell
         run: |
           Start-Sleep -Seconds 30
+          Start-Service docker
           docker version
-      
+
       - name: Build Project Using Docker
         shell: powershell
         run: |
