@@ -50,14 +50,15 @@ jobs:
       - name: Install Dependencies
         shell: powershell
         run: |
-          choco install -y make wget unzip docker-desktop docker-cli
+          choco install -y make wget unzip docker-desktop
+          Start-Process -NoNewWindow -Wait -FilePath "C:\Program Files\Docker\Docker"
       
-      - name: Start Docker Service
+      - name: Wait for Docker to Start
         shell: powershell
         run: |
-          Start-Service docker
+          Start-Sleep -Seconds 30
           docker version
-
+      
       - name: Build Project Using Docker
         shell: powershell
         run: |
