@@ -13,6 +13,9 @@ build:
 	@$(eval VERSION=$(shell git describe --tags --dirty --always))
 	CGO_ENABLED=1 go build -x -v -tags bn256 -ldflags "-X github.com/0chain/s3migration/cmd.VersionStr=$(VERSION)" -o s3mgrt main.go
 
+build-windows:
+	@$(eval VERSION=$(shell git describe --tags --dirty --always))
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=1 CC=x86_64-w64-mingw32-gcc go build -x -v -tags bn256 -ldflags "-X github.com/0chain/s3migration/cmd.VersionStr=$(VERSION)" -o s3mgrt.exe main.go
 
 help:
 	@echo "Environment: "
