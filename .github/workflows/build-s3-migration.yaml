@@ -55,6 +55,7 @@ jobs:
       - name: Refresh Environment Variables
         shell: powershell
         run: |
+          Import-Module "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"
           refreshenv
       
       # - name: Check if Docker is Running
