@@ -64,13 +64,15 @@ jobs:
           $dockerStatus = Get-Process -Name "Docker Desktop" -ErrorAction SilentlyContinue
           if ($dockerStatus -eq $null) {
             Start-Process -FilePath "C:\Program Files\Docker\Docker\Docker Desktop.exe" -Verb RunAs
+            Write-Output "Starting Docker Desktop..."
           } else {
-            Write-Output "Docker is already running."
+            Write-Output "Docker Desktop is already running."
           }
       
       - name: Start Docker Service
         shell: powershell
         run: |
+          Start-Sleep -Seconds 20
           Start-Service docker
           docker version
 
