@@ -50,8 +50,14 @@ jobs:
       - name: Install Dependencies
         shell: powershell
         run: |
-          choco install -y make wget unzip
-      
+          choco install -y make wget unzip git
+
+      - name: Add Git to PATH
+        shell: powershell
+        run: |
+          $env:PATH = "C:\Program Files\Git\cmd;$env:PATH"
+          git --version
+
       - name: Build Binary file
         shell: powershell
         run: |
