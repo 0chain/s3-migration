@@ -23,11 +23,7 @@ jobs:
           go-version: '1.22'
 
       - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          path: .
-          fetch-depth: 0
-          fetch-tags: true
+        uses: actions/checkout@v2
 
       - name: Get Branch
         id: get_branch
@@ -62,11 +58,16 @@ jobs:
           $env:PATH = "C:\Program Files\Git\cmd;$env:PATH"
           git --version
       
-      - name: Debug current directory
+      - name: Check for .git folder
         shell: powershell
         run: |
-          Get-Location
-          ls
+          cd "${{ github.workspace }}"
+          if (Test-Path ".git") {
+            Write-Host ".git folder exists ✅"
+          } else {
+            Write-Host ".git folder NOT FOUND ❌"
+            Get-ChildItem -Force
+          }
 
       - name: Build Binary file
         shell: powershell
