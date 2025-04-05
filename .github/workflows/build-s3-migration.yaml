@@ -53,7 +53,7 @@ jobs:
           choco install -y make wget unzip
       
       - name: Build Binary file
-        shell: powershell
+        shell: bash
         run: |
           make build-windows
 
