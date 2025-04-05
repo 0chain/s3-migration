@@ -22,10 +22,11 @@ jobs:
         with:
           go-version: '1.22'
 
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
-        fetch-tags: true 
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          fetch-tags: true 
 
       - name: Get Branch
         id: get_branch
