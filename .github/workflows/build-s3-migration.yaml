@@ -50,12 +50,16 @@ jobs:
       - name: Install Dependencies
         shell: powershell
         run: |
-          choco install -y make wget unzip git
+          choco install -y make wget unzip
       
       - name: Build Binary file
-        shell: bash
+        shell: powershell
         run: |
-          make build-windows
+          $env:GOOS = "windows"
+          $env:GOARCH = "amd64"
+          $env:CGO_ENABLED = "1"
+          $env:CC = "x86_64-w64-mingw32-gcc"
+          go build -x -v -tags bn256 -ldflags "-X github.com/0chain/s3migration/cmd.VersionStr=$(VERSION)" -o s3mgrt.exe main.go
 
       - name: Install AWS CLI
         if: github.ref == 'refs/heads/staging'
