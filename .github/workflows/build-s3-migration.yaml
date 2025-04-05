@@ -50,7 +50,7 @@ jobs:
       - name: Install Dependencies
         shell: powershell
         run: |
-          choco install -y make wget unzip
+          choco install -y make wget unzip git
       
       - name: Build Binary file
         shell: bash
