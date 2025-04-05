@@ -57,10 +57,18 @@ jobs:
         run: |
           $env:PATH = "C:\Program Files\Git\cmd;$env:PATH"
           git --version
+      
+      - name: Debug current directory
+        shell: powershell
+        run: |
+          Get-Location
+          ls
 
       - name: Build Binary file
         shell: powershell
         run: |
+          cd "${{ github.workspace }}"
+
           $env:PATH = "C:\Program Files\Git\cmd;$env:PATH"
           $version = git describe --tags --dirty --always
 
