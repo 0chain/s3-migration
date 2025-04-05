@@ -61,6 +61,7 @@ jobs:
       - name: Build Binary file
         shell: powershell
         run: |
+          $env:PATH = "C:\Program Files\Git\cmd;$env:PATH"
           $version = git describe --tags --dirty --always
 
           $env:GOOS = "windows"
