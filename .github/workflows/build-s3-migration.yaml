@@ -15,72 +15,22 @@ on:
 jobs:
   build-windows:
     name: Build-windows
-    runs-on: [self-hosted, windows-runner]
+    runs-on: windows-runner
+    defaults:
+      run:
+        shell: msys2 {0}
+    strategy:
+     matrix:
+      sys: [ MINGW64 ]
     steps:
-      - name: Setup go 1.22
-        uses: actions/setup-go@v3
+      - uses: msys2/setup-msys2@v2
         with:
-          go-version: '1.22'
+          msystem: ${{matrix.sys}}
 
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-          fetch-tags: true 
-
-      - name: Get Branch
-        id: get_branch
-        shell: powershell
+      - name: Install libraries
         run: |
-          $BRANCH = "${{ github.ref }}".Replace("refs/heads/", "").Replace("/", "-")
-          echo "BRANCH=$BRANCH" | Out-File -FilePath $env:GITHUB_ENV -Append
-          echo $BRANCH
+          echo 'Y'| pacman -S base-devel git gcc make
       
-      - name: Set GITHUB_ENV
-        shell: powershell
+      - name: Install Clang and Go for MINGW64
         run: |
-          $branch = "${{ github.ref }}"
-          if ($branch -eq "refs/heads/master") {
-            echo "TAG=v0.0.0-master" | Out-File -FilePath $env:GITHUB_ENV -Append
-          } elseif ($branch -eq "refs/heads/dev") {
-            echo "TAG=v0.0.0-dev" | Out-File -FilePath $env:GITHUB_ENV -Append
-          } elseif ($branch -eq "refs/heads/staging") {
-            echo "TAG=v0.0.0-staging" | Out-File -FilePath $env:GITHUB_ENV -Append
-          } else {
-            echo "TAG=v0.0.0-$branch" | Out-File -FilePath $env:GITHUB_ENV -Append
-          }
-      
-      - name: Install Dependencies
-        shell: powershell
-        run: |
-          choco install -y make wget unzip
-
-      - name: Build Binary file
-        shell: powershell
-        run: |
-          $env:GOOS = "windows"
-          $env:GOARCH = "amd64"
-          $env:CGO_ENABLED = "1"
-          $env:CC = "x86_64-w64-mingw32-gcc"
-
-          go build -x -v -tags bn256 -ldflags "-X github.com/0chain/s3migration/cmd.VersionStr=100.100.100" -o s3mgrt.exe main.go
-
-      - name: Install AWS CLI
-        if: github.ref == 'refs/heads/staging'
-        shell: powershell
-        run: |
-          Invoke-WebRequest -Uri "https://awscli.amazonaws.com/AWSCLIV2.msi" -OutFile "AWSCLIV2.msi"
-          Start-Process msiexec.exe -ArgumentList "/i AWSCLIV2.msi /quiet /norestart" -NoNewWindow -Wait
-
-      - name: Set AWS Credentials
-        if: github.ref == 'refs/heads/staging'
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.S3_ACCESS_KEY }}
-          aws-secret-access-key: ${{ secrets.S3_SECRET_KEY }}
-          aws-region: us-east-2
-      
-      - name: Set Box credentials
-        run: |
-          box-client-id=${{ secrets.BOX_CLIENT_ID }}
-          box-client-secret=${{ secrets.BOX_CLIENT_SECRET }}
+         echo 'y'| pacman -S  mingw-w64-x86_64-clang mingw-w64-x86_64-go zip unzip
