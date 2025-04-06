@@ -34,3 +34,16 @@ jobs:
       - name: Install Clang and Go for MINGW64
         run: |
          echo 'y'| pacman -S  mingw-w64-x86_64-clang mingw-w64-x86_64-go zip unzip
+
+      - name: Set environment variables
+        run: |
+           export GOROOT=/mingw64/lib/go
+           export GOPATH=/mingw64
+           export PATH=$PATH:$GOROOT/bin
+           export PATH=$PATH:/usr/bin/7z
+
+           # use clang as a default compiler for CGO
+           go env -w "CC=/mingw64/bin/clang.exe"
+
+      - name: Checkout
+        uses: actions/checkout@v4
