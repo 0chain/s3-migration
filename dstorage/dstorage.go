@@ -107,7 +107,6 @@ func (d *DStorageService) Upload(ctx context.Context, remotePath string, r io.Re
 		MimeType:   contentType,
 		RemoteName: path.Base(remotePath),
 	}
-
 	opType := constants.FileOperationInsert
 	if isUpdate {
 		opType = constants.FileOperationUpdate
@@ -125,6 +124,9 @@ func (d *DStorageService) Upload(ctx context.Context, remotePath string, r io.Re
 		FileReader:    util.NewFileReader(r),
 		RemotePath:    remotePath,
 		Opts:          options,
+	}
+	if size == 0 {
+		op.StreamUpload = true
 	}
 	return op
 }
