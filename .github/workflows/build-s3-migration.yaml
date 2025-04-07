@@ -80,6 +80,10 @@ jobs:
           aws-access-key-id: ${{ secrets.S3_ACCESS_KEY }}
           aws-secret-access-key: ${{ secrets.S3_SECRET_KEY }}
           aws-region: us-east-2
+#      - name: Set Box credentials
+#        run: |
+#          box-client-id=${{ secrets.BOX_CLIENT_ID }}
+#          box-client-secret=${{ secrets.BOX_CLIENT_SECRET }}
 
       - name: Push to AWS S3
         if:  github.ref == 'refs/heads/staging'
