@@ -8,8 +8,10 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
+	zlogger "github.com/0chain/s3migration/logger"
 	T "github.com/0chain/s3migration/types"
 	"github.com/pkg/errors"
 
@@ -65,7 +67,7 @@ func (d *DropboxClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta, <-
 		arg := files.NewListFolderArg("") // "" for Root
 		arg.Recursive = true
 		arg.Limit = 100
-		arg.IncludeNonDownloadableFiles = false
+		arg.IncludeNonDownloadableFiles = true
 
 		res, err := d.dropboxFiles.ListFolder(arg)
 		if err != nil {
@@ -73,22 +75,51 @@ func (d *DropboxClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta, <-
 			return
 		}
 
-		for _, entry := range res.Entries {
-			if meta, ok := entry.(*files.FileMetadata); ok {
-				lastModified := meta.ClientModified
+		isNonDownloadableFile := func(meta *files.FileMetadata) bool {
+			return strings.HasPrefix(meta.ContentHash, "paper") ||
+				strings.Contains(meta.PathLower, ".paper") ||
+				!meta.IsDownloadable
+		}
 
-				if (d.newerThan == nil || d.newerThan.Unix() == 0 || lastModified.Unix() >= d.newerThan.Unix()) &&
-					(d.olderThan == nil || d.olderThan.Unix() == 0 || lastModified.Unix() <= d.olderThan.Unix()) {
-					objectChan <- &T.ObjectMeta{
-						Key:         meta.PathDisplay,
-						Size:        int64(meta.Size),
-						ContentType: mime.TypeByExtension(filepath.Ext(meta.PathDisplay)),
-						Ext:         filepath.Ext(meta.PathDisplay),
+		processEntries := func(entries []files.IsMetadata) {
+			for _, entry := range entries {
+				if meta, ok := entry.(*files.FileMetadata); ok {
+					lastModified := meta.ClientModified
+
+					if (d.newerThan == nil || d.newerThan.Unix() == 0 || lastModified.Unix() >= d.newerThan.Unix()) &&
+						(d.olderThan == nil || d.olderThan.Unix() == 0 || lastModified.Unix() <= d.olderThan.Unix()) {
+
+						ext := filepath.Ext(meta.PathDisplay)
+						name := meta.Name
+						zlogger.Logger.Info(meta)
+						zlogger.Logger.Info("file information")
+						size := meta.Size
+						if isNonDownloadableFile(meta) {
+							ext = ".txt"
+							if !strings.HasSuffix(name, ".txt") {
+								name += ".txt"
+							}
+							zlogger.Logger.Info(fmt.Sprintf("Non-downloadable file detected: %s, will be exported as text", meta.Name))
+							size = 0
+						}
+
+						objectChan <- &T.ObjectMeta{
+							Key:          meta.PathDisplay,
+							Size:         int64(size),
+							ContentType:  mime.TypeByExtension(ext),
+							Ext:          ext,
+							Name:         &name,
+							ParentPath:   nil,  // object key holds file path
+						}
 					}
 				}
 			}
 		}
 
+		// Process initial entries
+		processEntries(res.Entries)
+
+		// Continue processing if there are more entries
 		cursor := res.Cursor
 		hasMore := res.HasMore
 
@@ -100,21 +131,12 @@ func (d *DropboxClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta, <-
 				return
 			}
 
-			for _, entry := range res.Entries {
-				if meta, ok := entry.(*files.FileMetadata); ok {
-					objectChan <- &T.ObjectMeta{
-						Key:         meta.PathDisplay,
-						Size:        int64(meta.Size),
-						ContentType: mime.TypeByExtension(filepath.Ext(meta.PathDisplay)),
-					}
-				}
-			}
+			processEntries(res.Entries)
 
 			cursor = res.Cursor
 			hasMore = res.HasMore
 		}
 	}()
-
 	return objectChan, errChan
 }
 

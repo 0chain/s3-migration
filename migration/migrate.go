@@ -120,21 +120,17 @@ func updateTotalObjects(totalObjChan chan struct{}, wd string) error {
 
 func InitMigration(mConfig *MigrationConfig) error {
 	zlogger.Logger.Info("Initializing migration")
-	zlogger.Logger.Info("Getting dStorage service")
-	// delete files at this level to ignore duplicate scenario
-	if err := os.Remove(filepath.Join("files.count")); err != nil {
-		zlogger.Logger.Error("Failed to remove files.count file: ", err)
-	}
-	if err := os.Remove(filepath.Join("upload.count")); err != nil {
-		zlogger.Logger.Error("Failed to remove upload.count file: ", err)
-	}
-	if err := os.Remove(migration.stateFilePath); err != nil {
-		zlogger.Logger.Error("Failed to remove state file: ", err)
-	}
-	if err := os.Remove(filepath.Join("migration_time.txt")); err != nil {
-		zlogger.Logger.Error("Failed to remove migration_time.txt file: ", err)
+
+	logsPath := filepath.Join(migration.workDir, "logs")
+	if _, err := os.Stat(logsPath); err == nil {
+		if err := os.RemoveAll(logsPath); err != nil {
+			zlogger.Logger.Error("Failed to remove logs folder:", err)
+		}
+	} else if !os.IsNotExist(err) {
+		zlogger.Logger.Error("Error checking logs folder:", err)
 	}
 
+	zlogger.Logger.Info("Getting dStorage service")
 	dStorageService, err := dStorage.GetDStorageService(
 		mConfig.AllocationID,
 		mConfig.MigrateToPath,
@@ -396,34 +392,88 @@ func getValueBasedOnKey(field_name string, key string, obj types.ObjectMeta) str
 
 func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorker) {
 	defer migrator.CloseDownloadQueue()
-	totalObjChan := make(chan struct{}, 100)
-	defer close(totalObjChan)
-	go updateTotalObjects(totalObjChan, m.workDir)
-	objCh, errCh := migration.dataSourceStore.ListFiles(rootContext)
-	wg := &sync.WaitGroup{}
-	ops := make([]MigrationOperation, 0, m.batchSize)
-	var opLock sync.Mutex
-	currentSize := 0
-	opCtx, opCtxCancel := context.WithCancel(ctx)
-	var files_count = 0
-	var totalSize int64
 
-	// Create failed downloads file
+	downloadStartTime := time.Now()
+
+	var allObjects []*T.ObjectMeta
+	var totalCount int
+	var totalSize int64
+	nameMap := make(map[string]bool) // Track existing names
+
 	downloadFailedFile, err2 := os.OpenFile(filepath.Join(m.workDir, downloadFailedFileName), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err2 != nil {
 		zlogger.Logger.Error("Failed to create download failed file:", err2)
 	}
 	defer downloadFailedFile.Close()
 
+	objCh, errCh := migration.dataSourceStore.ListFiles(rootContext)
+
 	for obj := range objCh {
-		zlogger.Logger.Info("Downloading object: ", obj.Key)
-		files_count++
+		baseName := getValueBasedOnKey("objectName", migration.key, *obj)
+		if _, exists := nameMap[baseName]; exists {
+			h := sha1.New()
+			uniqueInput := fmt.Sprintf("%s-%s-%d", obj.Key, baseName, time.Now().UnixNano())
+			h.Write([]byte(uniqueInput))
+			uniqueSuffix := hex.EncodeToString(h.Sum(nil))[:8] // Use first 8 chars of hash
+
+			newName := fmt.Sprintf("%s_%s", baseName, uniqueSuffix)
+			obj.Name = &newName
+		} else {
+			nameMap[baseName] = true
+		}
+
+		allObjects = append(allObjects, obj)
+		totalCount++
 		totalSize += obj.Size
+		zlogger.Logger.Info(fmt.Sprintf("Discovered object: %s, size: %d", obj.Key, obj.Size))
+	}
+
+	go func() {
+		f, err := os.Create(filepath.Join(m.workDir, "files.count"))
+		if err != nil {
+			zlogger.Logger.Error(err)
+			return
+		}
+		defer f.Close()
+		_, err = f.WriteString(strconv.Itoa(totalCount))
+		if err != nil {
+			zlogger.Logger.Error(err)
+		}
+		zlogger.Logger.Info(fmt.Sprintf("Total files to migrate: %d", totalCount))
+	}()
+
+	if err := <-errCh; err != nil {
+		zlogger.Logger.Error("Error listing files:", err)
+		migrator.SetMigrationError(err)
+		return
+	}
+
+	listingTime := time.Since(downloadStartTime)
+	estimatedlistingTime := listingTime * time.Duration(totalCount)
+	estimatedTotalTime := estimatedlistingTime * 2
+	go func() {
+		migrationTimeFilePath := filepath.Join(m.workDir, "migration_time.txt")
+		estimateStr := fmt.Sprintf("Estimated time: %v\nFiles to process: %d\nTotal size: %d bytes",
+			estimatedTotalTime, totalCount, totalSize)
+		if err := os.WriteFile(migrationTimeFilePath, []byte(estimateStr), 0644); err != nil {
+			zlogger.Logger.Error("Failed to write estimated migration time:", err)
+		}
+	}()
+
+	wg := &sync.WaitGroup{}
+	ops := make([]MigrationOperation, 0, m.batchSize)
+	var opLock sync.Mutex
+	currentSize := 0
+	opCtx, opCtxCancel := context.WithCancel(ctx)
+
+	for _, obj := range allObjects {
+		zlogger.Logger.Info("Downloading object: ", obj.Key)
 		migrator.PauseDownload()
 		if migrator.IsMigrationError() {
 			opCtxCancel()
 			return
 		}
+
 		if currentSize >= m.batchSize {
 			// Here scope of improvement
 			wg.Wait()
@@ -437,8 +487,9 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 			ops = nil
 			currentSize = 0
 		}
+
 		currentSize++
-		zlogger.Logger.Info("Downloding object info ", obj.Key, obj.Name, obj.Size)
+		zlogger.Logger.Info("Downloading object info ", obj.Key, obj.Name, obj.Size)
 		downloadObjMeta := &DownloadObjectMeta{
 			ObjectKey:  getValueBasedOnKey("objectKey", migration.key, *obj),
 			ObjectName: getValueBasedOnKey("objectName", migration.key, *obj),
@@ -446,72 +497,77 @@ func (m *Migration) DownloadWorker(ctx context.Context, migrator *MigrationWorke
 			DoneChan:   make(chan struct{}, 1),
 			ErrChan:    make(chan error, 1),
 			mimeType:   obj.ContentType,
+			ParentPath: *&obj.ParentPath,
 		}
+
 		wg.Add(1)
-		go func() {
+		go func(objMeta *DownloadObjectMeta) {
 			defer func(start time.Time) {
-				zlogger.Logger.Info("downloadObjMeta key:  ", downloadObjMeta.ObjectName, time.Since(start))
-				if err := m.logFileStatus(downloadObjMeta.ObjectName, downloadObjMeta.Size, "DOWNLOAD_COMPLETED", ""); err != nil {
+				zlogger.Logger.Info("downloadObjMeta key:  ", objMeta.ObjectName, time.Since(start))
+				if err := m.logFileStatus(objMeta.ObjectName, objMeta.Size, "DOWNLOAD_COMPLETED", ""); err != nil {
 					zlogger.Logger.Error("Failed to log file status: ", err)
 				}
 			}(time.Now())
 
 			defer wg.Done()
-			err := checkIsFileExist(ctx, downloadObjMeta)
+			err := checkIsFileExist(ctx, objMeta)
 			if err != nil {
 				zlogger.Logger.Error("check file error: ", err)
 				// Log failed download but continue
-				if _, writeErr := downloadFailedFile.WriteString(fmt.Sprintf("%s\t%s\n", downloadObjMeta.ObjectName, err.Error())); writeErr != nil {
+				if _, writeErr := downloadFailedFile.WriteString(fmt.Sprintf("%s\t%s\n", objMeta.ObjectName, err.Error())); writeErr != nil {
 					zlogger.Logger.Error("Failed to write to download failed file:", writeErr)
 				}
 				migrator.SetMigrationError(err)
 				return
 			}
-			if downloadObjMeta.IsFileAlreadyExist && migration.skip == Skip {
-				zlogger.Logger.Info("Skipping migration of object" + downloadObjMeta.ObjectName)
-				migrator.DownloadStart(downloadObjMeta)
-				migrator.DownloadDone(downloadObjMeta, "", nil)
-				return
+			var op MigrationOperation
+			gdrive, ok := migration.dataSourceStore.(*gdrive.GoogleDriveClient)
+			if ok {
+				r, w := io.Pipe()
+				go func() {
+					migrator.DownloadStart(downloadObjMeta)
+					zlogger.Logger.Info("Downloading object: ", downloadObjMeta.ObjectName)
+					derr := gdrive.DownloadFile(opCtx, objMeta.ObjectKey, w)
+					migrator.DownloadDone(downloadObjMeta, "", derr)
+				}()
+				op, _ = processOperationForMemory(ctx, objMeta, r)
+			} else {
+				dataChan := make(chan *util.DataChan, 200)
+				streamWriter := util.NewStreamWriter(dataChan)
+				go m.processChunkDownload(opCtx, streamWriter, migrator, objMeta)
+				op, _ = processOperationForMemory(ctx, objMeta, streamWriter)
 			}
-			dataChan := make(chan *util.DataChan, 200)
-			streamWriter := util.NewStreamWriter(dataChan)
-			go m.processChunkDownload(opCtx, streamWriter, migrator, downloadObjMeta)
-			// Always return nil as error
-			totalObjChan <- struct{}{}
-			op, _ := processOperationForMemory(ctx, downloadObjMeta, streamWriter)
+
 			opLock.Lock()
 			ops = append(ops, op)
 			opLock.Unlock()
-		}()
+		}(downloadObjMeta)
 	}
 
-	go func() {
-		f, err := os.Create(filepath.Join(m.workDir, "files.count"))
-		if err != nil {
-			zlogger.Logger.Error(err)
-			return
-		}
-		defer f.Close()
-		_, err = f.WriteString(strconv.Itoa(files_count))
-		if err != nil {
-			zlogger.Logger.Error(err)
-		}
-	}()
-
+	// Process any remaining operations
 	if currentSize > 0 {
 		wg.Wait()
 		processOps := ops
-		// Here scope of improvement
 		m.processMultiOperation(ctx, processOps, migrator)
 		ops = nil
 	}
+
+	downloadTime := time.Since(downloadStartTime)
+	estimatedRemainingTime := downloadTime * 2
+	totalEstimatedTime := downloadTime + estimatedRemainingTime
+
+	go func() {
+		migrationTimeFilePath := filepath.Join(m.workDir, "migration_time_actual.txt")
+		timeStr := fmt.Sprintf("Download time: %v\nEstimated total time: %v\nFiles processed: %d\nTotal size: %d bytes",
+			downloadTime, totalEstimatedTime, totalCount, totalSize)
+		if err := os.WriteFile(migrationTimeFilePath, []byte(timeStr), 0644); err != nil {
+			zlogger.Logger.Error("Failed to write actual migration time:", err)
+		}
+	}()
+
 	opCtxCancel()
 	wg.Wait()
-	err := <-errCh
-	if err != nil {
-		zlogger.Logger.Error(err)
-		migrator.SetMigrationError(err)
-	}
+
 	migrator.CloseUploadQueue()
 }
 
@@ -628,12 +684,20 @@ func getUniqueShortObjKey(objectKey string) string {
 	return objectKey
 }
 
-func getRemotePath(objectKey string) string {
-	return path.Join(migration.migrateTo, migration.bucket, getUniqueShortObjKey(objectKey))
+func getRemotePath(objectKey string, parentPath interface{}) string {
+	var fullPath string
+
+	if parentPathStr, ok := parentPath.(*string); ok && parentPathStr != nil && *parentPathStr != "" {
+		fullPath = path.Join(migration.migrateTo, migration.bucket, *parentPathStr, getUniqueShortObjKey(objectKey))
+	} else {
+		fullPath = path.Join(migration.migrateTo, migration.bucket, getUniqueShortObjKey(objectKey))
+	}
+
+	return fullPath
 }
 
 func checkIsFileExist(ctx context.Context, downloadObj *DownloadObjectMeta) error {
-	remotePath := getRemotePath(downloadObj.ObjectName)
+	remotePath := getRemotePath(downloadObj.ObjectName, downloadObj.ParentPath)
 
 	var isFileExist bool
 	err := util.Retry(3, time.Second*5, func() error {
@@ -666,7 +730,7 @@ func processOperation(ctx context.Context, downloadObj *DownloadObjectMeta) (Mig
 		zlogger.Logger.Info("uploading object key:  ", downloadObj.ObjectName, time.Since(start))
 	}(time.Now())
 
-	remotePath := getRemotePath(downloadObj.ObjectName)
+	remotePath := getRemotePath(downloadObj.ObjectName, downloadObj.ParentPath)
 	var op MigrationOperation
 	fileObj, err := migration.fs.Open(downloadObj.LocalPath)
 	if err != nil {
@@ -702,7 +766,7 @@ func processOperation(ctx context.Context, downloadObj *DownloadObjectMeta) (Mig
 }
 
 func processOperationForMemory(ctx context.Context, downloadObj *DownloadObjectMeta, r io.Reader) (MigrationOperation, error) {
-	remotePath := getRemotePath(downloadObj.ObjectName)
+	remotePath := getRemotePath(downloadObj.ObjectName, downloadObj.ParentPath)
 	var op MigrationOperation
 	mimeType := downloadObj.mimeType
 	var fileOperation sdk.OperationRequest

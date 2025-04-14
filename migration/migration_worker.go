@@ -40,6 +40,7 @@ type DownloadObjectMeta struct {
 	IsFileAlreadyExist bool
 	mimeType           string
 	Ext                string
+	ParentPath         *string
 }
 
 type UploadObjectMeta struct {

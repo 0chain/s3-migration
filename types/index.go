@@ -19,6 +19,7 @@ type ObjectMeta struct {
 	Id          *string
 	Ext         string
 	Name        *string
+	ParentPath  *string
 }
 
 type CloudStorageI interface {

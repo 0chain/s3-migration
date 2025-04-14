@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	zlogger "github.com/0chain/s3migration/logger"
@@ -57,60 +58,105 @@ func (g *OneDriveClient) ListFiles(ctx context.Context) (<-chan *T.ObjectMeta, <
 		return objectChan, errChan
 	}
 
+	isDefaultFile := func(mimeType string) bool {
+		defaultTypes := []string{
+			"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+			"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+			"application/vnd.openxmlformats-officedocument.presentationml.presentation",
+			"application/vnd.ms-excel",
+			"application/vnd.ms-word",
+			"application/vnd.ms-powerpoint",
+			"application/vnd.onenote",
+		}
+		for _, t := range defaultTypes {
+			if strings.HasPrefix(mimeType, t) {
+				return true
+			}
+		}
+		return false
+	}
+
 	go func() {
 		defer func() {
 			close(objectChan)
 			close(errChan)
 		}()
 
-		filesRes, err := g.client.DriveItems.List(ctx, "")
-
-		if filesRes == nil {
-			errChan <- fmt.Errorf("received nil response from List")
-			return
+		// Map to store folder ID to folder name mapping
+		folderNames := make(map[string]string)
+		// Queue to store folder IDs and their paths
+		type folderInfo struct {
+			id   string
+			path string
 		}
+		folderQueue := []folderInfo{{id: "", path: ""}}
 
-		if err != nil {
-			errChan <- err
-			return
-		}
-		for _, entry := range filesRes.DriveItems {
-			mimeType := "None"
+		for len(folderQueue) > 0 {
+			current := folderQueue[0]
+			folderQueue = folderQueue[1:]
 
-			if entry.Size == 0 {
-				continue
-			}
-			if entry.File != nil {
-				mimeType = entry.File.MIMEType
-			}
-			lastModified, err := time.Parse(time.RFC3339, entry.LastModified)
-
+			filesRes, err := g.client.DriveItems.List(ctx, current.id)
 			if err != nil {
-				zlogger.Logger.Error(err)
+				errChan <- err
 				continue
 			}
-			if (g.newerThan == nil || g.newerThan.Unix() == 0 || lastModified.Unix() >= g.newerThan.Unix()) &&
-				(g.olderThan == nil || g.olderThan.Unix() == 0 || lastModified.Unix() <= g.olderThan.Unix()) {
 
-				objectChan <- &T.ObjectMeta{
-					Key:         entry.Name,
-					Size:        entry.Size,
-					ContentType: mimeType,
-					Ext:         filepath.Ext(entry.DownloadURL),
-					Id:          &entry.Id,
+			if filesRes == nil {
+				errChan <- fmt.Errorf("received nil response from List for folder: %s", current.id)
+				continue
+			}
+
+			for _, entry := range filesRes.DriveItems {
+				if entry.Folder != nil {
+					folderNames[entry.Id] = entry.Name
+					newPath := entry.Name
+					if current.path != "" {
+						newPath = current.path + "/" + entry.Name
+					}
+					folderQueue = append(folderQueue, folderInfo{
+						id:   entry.Id,
+						path: newPath,
+					})
+					continue
+				}
+
+				mimeType := "None"
+				if entry.File != nil {
+					mimeType = entry.File.MIMEType
+				}
+
+
+				lastModified, err := time.Parse(time.RFC3339, entry.LastModified)
+				if err != nil {
+					zlogger.Logger.Error(err)
+					continue
+				}
+
+				if (g.newerThan == nil || g.newerThan.Unix() == 0 || lastModified.Unix() >= g.newerThan.Unix()) &&
+					(g.olderThan == nil || g.olderThan.Unix() == 0 || lastModified.Unix() <= g.olderThan.Unix()) {
+
+					size := entry.Size
+					if isDefaultFile(mimeType) {
+						size = 0
+						zlogger.Logger.Info(fmt.Sprintf("Default file detected: %s, setting size to 0", entry.Name))
+					}
+
+					parentPath := current.path
+
+					objectChan <- &T.ObjectMeta{
+						Key:         entry.Name,
+						Size:        size,
+						ContentType: mimeType,
+						Ext:         filepath.Ext(entry.DownloadURL),
+						Id:          &entry.Id,
+						ParentPath:  &parentPath,
+					}
 				}
 			}
 		}
 	}()
 
-	go func() {
-		for err := range errChan {
-			fmt.Println("Error:", err) // Use a proper logging library if needed
-		}
-	}()
-
 	return objectChan, errChan
-
 }
 
 func (g *OneDriveClient) GetFileContent(ctx context.Context, fileID string) (*T.Object, error) {

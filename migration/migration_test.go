@@ -67,9 +67,9 @@ func TestMigrate(t *testing.T) {
 					return func(stateKey string) {}, func() {}, nil
 				}
 
-				dStorageService.EXPECT().IsFileExist(gomock.Any(), getRemotePath("file1")).Return(false, nil)
-				dStorageService.EXPECT().IsFileExist(gomock.Any(), getRemotePath("file2")).Return(false, nil)
-				dStorageService.EXPECT().IsFileExist(gomock.Any(), getRemotePath("file3")).Return(false, nil)
+				dStorageService.EXPECT().IsFileExist(gomock.Any(), getRemotePath("file1", nil)).Return(false, nil)
+				dStorageService.EXPECT().IsFileExist(gomock.Any(), getRemotePath("file2", nil)).Return(false, nil)
+				dStorageService.EXPECT().IsFileExist(gomock.Any(), getRemotePath("file3", nil)).Return(false, nil)
 
 				fileInfo := mock_util.NewMockFileInfo(ctrl)
 				file1Data := mock_util.NewMockFile(ctrl)
@@ -97,9 +97,9 @@ func TestMigrate(t *testing.T) {
 				fileSystem.EXPECT().Remove("/aws/file2").Return(nil)
 				fileSystem.EXPECT().Remove("/aws/file3").Return(nil)
 
-				dStorageService.EXPECT().Upload(gomock.Any(), getRemotePath("file1"), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
-				dStorageService.EXPECT().Upload(gomock.Any(), getRemotePath("file2"), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
-				dStorageService.EXPECT().Upload(gomock.Any(), getRemotePath("file3"), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				dStorageService.EXPECT().Upload(gomock.Any(), getRemotePath("file1", nil), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				dStorageService.EXPECT().Upload(gomock.Any(), getRemotePath("file2", nil), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				dStorageService.EXPECT().Upload(gomock.Any(), getRemotePath("file3", nil), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 			},
 			wantErr: false,
 		},
@@ -122,7 +122,7 @@ func TestMigrate(t *testing.T) {
 					return func(stateKey string) {}, func() {}, nil
 				}
 
-				dStorageService.EXPECT().IsFileExist(gomock.Any(), getRemotePath("file11")).Return(false, nil)
+				dStorageService.EXPECT().IsFileExist(gomock.Any(), getRemotePath("file11", nil)).Return(false, nil)
 
 				awsStorageService.EXPECT().DownloadToFile(gomock.Any(), "file11").AnyTimes().Return("", errors.New("some error"))
 			},
